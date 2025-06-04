@@ -1,15 +1,26 @@
 import React from 'react';
 import Navbar from './components/Navbar';
 import './App.css'; 
+// Import MUI Container and Typography
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+
 
 function App() {
   return (
     <div>
-      <Navbar /> {/* This is where you render your Navbar */}
-      <main style={{ padding: '20px' }}>
-        <h2>Welcome to your Regulatory Compliance Assistant!</h2>
-        <p>Upload documents here to get started.</p>
-      </main>
+      <Navbar /> {/* Your MUI Navbar component */}
+      {/* Replace <main> and your old container div with MUI Container */}
+      <Container component="main" maxWidth="md" sx={{ mt: 4, mb: 4, p: 3, backgroundColor: 'white', borderRadius: 2, boxShadow: 3 }}>
+        {/* Using MUI Typography for headings and paragraphs */}
+        <Typography variant="h4" component="h1" gutterBottom>
+          Welcome to your Regulatory Compliance Assistant!
+        </Typography>
+        <Typography variant="body1" paragraph>
+          Upload documents here to get started. Our AI will help you understand and comply with regulations.
+        </Typography>
+        {/* You'll add more components here later, like file upload forms etc. */}
+      </Container>
     </div>
   );
 }

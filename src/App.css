@@ -11,7 +11,9 @@ body {
       max-width: 960px; /* Max width for content */
       margin: 20px auto; /* Center the container with some top/bottom margin */
       padding: 20px; /* Inner spacing */
-      background-color: #fff; /* White background for the content area */
+      text-align: center;
+      background-color: #a06b6b; /* White background for the content area */
+      min-height: 200px;
       border-radius: 8px; /* Slightly rounded corners */
       box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow for depth */
   }
