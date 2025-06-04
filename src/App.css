@@ -1,0 +1,17 @@
+/* src/App.css */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4; /* Light gray background */
+    color: #333; /* Dark gray text color */
+  }
+  
+  /* Basic container for main content */
+  .container {
+      max-width: 960px; /* Max width for content */
+      margin: 20px auto; /* Center the container with some top/bottom margin */
+      padding: 20px; /* Inner spacing */
+      background-color: #fff; /* White background for the content area */
+      border-radius: 8px; /* Slightly rounded corners */
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+  }
