@@ -1,23 +1,14 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import Navbar from './components/Navbar';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <Navbar /> {/* This is where you render your Navbar */}
+      <main style={{ padding: '20px' }}>
+        <h2>Welcome to your Regulatory Compliance Assistant!</h2>
+        <p>Upload documents here to get started.</p>
+      </main>
     </div>
   );
 }
