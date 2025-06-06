@@ -5,6 +5,7 @@ import './App.css';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import FileUpload from './components/FileUpload';
+import DocumentList from './components/DocumentList'; // NEW: Import DocumentList
 
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         </Typography>
         {/* You'll add more components here later, like file upload forms etc. */}
         <FileUpload />
+        <DocumentList /> {/* NEW: Add DocumentList component to display uploaded documents */}
       </Container>
     </div>
   );
