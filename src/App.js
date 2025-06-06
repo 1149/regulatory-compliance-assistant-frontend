@@ -4,6 +4,7 @@ import './App.css';
 // Import MUI Container and Typography
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
+import FileUpload from './components/FileUpload';
 
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           Upload documents here to get started. Our AI will help you understand and comply with regulations.
         </Typography>
         {/* You'll add more components here later, like file upload forms etc. */}
+        <FileUpload />
       </Container>
     </div>
   );
