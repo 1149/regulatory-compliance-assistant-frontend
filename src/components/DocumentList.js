@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Paper, CircularProgress 
-} from '@mui/material';
+  TableContainer, TableHead, TableRow, Paper, CircularProgress,
+  Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+} from '@mui/material'; // NEW: Import Button, Dialog components
 
 function DocumentList() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [currentSummary, setCurrentSummary] = useState('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+  const [currentDocumentName, setCurrentDocumentName] = useState('');
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -30,6 +36,63 @@ function DocumentList() {
 
     fetchDocuments();
   }, []); // Empty dependency array means this runs once on mount
+
+  //  Handle Summarize Button Click (using primary cloud-based LLM)
+  const handleSummarize = async (documentId, documentFilename, useLocalLLM = false) => {
+    setOpenDialog(true);
+    setCurrentSummary('');
+    setSummaryError('');
+    setSummaryLoading(true);
+    setCurrentDocumentName(documentFilename);
+
+    try {
+      // Fetch the document's text first
+      const textResponse = await fetch(`http://127.0.0.1:8000/api/documents/${documentId}/text`);
+      if (!textResponse.ok) {
+        throw new Error(`Failed to fetch document text: ${textResponse.statusText}`);
+      }
+      const documentText = await textResponse.text(); // text() because the endpoint returns plain string
+
+      // NEW: Add console.log to check content and type
+      console.log("Fetched document text length:", documentText.length);
+      console.log("Fetched document text (first 100 chars):", documentText.substring(0, 100));
+      console.log("Type of fetched documentText:", typeof documentText);
+
+      // Determine which summarization endpoint to use
+      const summarizeEndpoint = useLocalLLM 
+        ? 'http://127.0.0.1:8000/api/summarize-text-local/' 
+        : 'http://127.0.0.1:8000/api/summarize-text/'; // Primary: Gemini (cloud)
+
+      const summarizeResponse = await fetch(summarizeEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: documentText }),
+      });
+
+      if (!summarizeResponse.ok) {
+        const errorData = await summarizeResponse.json();
+        throw new Error(`Failed to get summary: ${errorData.detail || summarizeResponse.statusText}`);
+      }
+      const data = await summarizeResponse.json();
+      setCurrentSummary(data.summary);
+
+    } catch (e) {
+      setSummaryError(`Error summarizing document: ${e.message}`);
+      console.error('Summarization error:', e);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setCurrentSummary('');
+    setSummaryError('');
+    setCurrentDocumentName('');
+  };
+
 
   if (loading) {
     return (
@@ -68,7 +131,8 @@ function DocumentList() {
               <TableCell>Filename</TableCell>
               <TableCell>Upload Date</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Text Path</TableCell>
+              <TableCell>Actions (Cloud)</TableCell> {/* NEW: Actions column for Cloud LLM */}
+              <TableCell>Actions (Local)</TableCell> {/* NEW: Actions column for Local LLM */}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -78,12 +142,60 @@ function DocumentList() {
                 <TableCell>{doc.filename}</TableCell>
                 <TableCell>{new Date(doc.upload_date).toLocaleString()}</TableCell>
                 <TableCell>{doc.status}</TableCell>
-                <TableCell>{doc.path_to_text}</TableCell>
+                <TableCell> {/* NEW: Actions cell for Cloud LLM */}
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    onClick={() => handleSummarize(doc.id, doc.filename, false)} // False for Cloud LLM
+                    disabled={doc.status !== 'processed_text'} // Only summarize if text is extracted
+                  >
+                    Summarize (Cloud)
+                  </Button>
+                </TableCell>
+                <TableCell> {/* NEW: Actions cell for Local LLM */}
+                  <Button 
+                    variant="text" 
+                    size="small" 
+                    onClick={() => handleSummarize(doc.id, doc.filename, true)} // True for Local LLM
+                    disabled={doc.status !== 'processed_text'} // Only summarize if text is extracted
+                  >
+                    Summarize (Local)
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+
+        {/* Summary Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
+        <DialogTitle>Summary for: {currentDocumentName}</DialogTitle>
+        <DialogContent>
+          {summaryLoading ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4 }}>
+              <CircularProgress />
+              <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+                {currentSummary.includes('Local LLM') ? 'Local LLM might take a while...' : 'Summarizing with cloud LLM...'}
+              </Typography>
+              {currentSummary.includes('Local LLM') && (
+                <Typography variant="caption" sx={{ mt: 1, color: 'text.disabled' }}>
+                  (This is a demonstration of local inference, performance varies based on hardware.)
+                </Typography>
+              )}
+            </Box>
+          ) : summaryError ? (
+            <Typography color="error" sx={{ whiteSpace: 'pre-wrap' }}>{summaryError}</Typography>
+          ) : (
+            <DialogContentText sx={{ whiteSpace: 'pre-wrap' }}>
+              {currentSummary || "No summary available."}
+            </DialogContentText>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
