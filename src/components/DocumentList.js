@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
-  Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+  Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  List, ListItem, ListItemText, Divider
 } from '@mui/material'; // NEW: Import Button, Dialog components
 
 function DocumentList() {
@@ -14,6 +15,11 @@ function DocumentList() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
   const [currentDocumentName, setCurrentDocumentName] = useState('');
+  const [openEntitiesDialog, setOpenEntitiesDialog] = useState(false);
+  const [currentEntities, setCurrentEntities] = useState([]);
+  const [entitiesLoading, setEntitiesLoading] = useState(false);
+  const [entitiesError, setEntitiesError] = useState('');
+  const [currentDocumentNameEntities, setCurrentDocumentNameEntities] = useState('');
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -86,6 +92,29 @@ function DocumentList() {
     }
   };
 
+  // Handle View Entities Button Click
+  const handleViewEntities = async (documentId, documentFilename) => {
+    setOpenEntitiesDialog(true);
+    setCurrentEntities([]);
+    setEntitiesError('');
+    setEntitiesLoading(true);
+    setCurrentDocumentNameEntities(documentFilename);
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/documents/${documentId}/entities`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch entities: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setCurrentEntities(data);
+    } catch (e) {
+      setEntitiesError(`Error fetching entities: ${e.message}`);
+      console.error('Entities fetch error:', e);
+    } finally {
+      setEntitiesLoading(false);
+    }
+  };
+
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setCurrentSummary('');
@@ -93,6 +122,12 @@ function DocumentList() {
     setCurrentDocumentName('');
   };
 
+  const handleCloseEntitiesDialog = () => {
+    setOpenEntitiesDialog(false);
+    setCurrentEntities([]);
+    setEntitiesError('');
+    setCurrentDocumentNameEntities('');
+  };
 
   if (loading) {
     return (
@@ -131,8 +166,9 @@ function DocumentList() {
               <TableCell>Filename</TableCell>
               <TableCell>Upload Date</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Actions (Cloud)</TableCell> {/* NEW: Actions column for Cloud LLM */}
-              <TableCell>Actions (Local)</TableCell> {/* NEW: Actions column for Local LLM */}
+              <TableCell>Actions (Cloud)</TableCell>
+              <TableCell>Actions (Local)</TableCell>
+              <TableCell>Entities</TableCell> {/* NEW: Entities column */}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -142,24 +178,34 @@ function DocumentList() {
                 <TableCell>{doc.filename}</TableCell>
                 <TableCell>{new Date(doc.upload_date).toLocaleString()}</TableCell>
                 <TableCell>{doc.status}</TableCell>
-                <TableCell> {/* NEW: Actions cell for Cloud LLM */}
+                <TableCell>
                   <Button 
                     variant="outlined" 
                     size="small" 
-                    onClick={() => handleSummarize(doc.id, doc.filename, false)} // False for Cloud LLM
-                    disabled={doc.status !== 'processed_text'} // Only summarize if text is extracted
+                    onClick={() => handleSummarize(doc.id, doc.filename, false)}
+                    disabled={doc.status !== 'processed_text'}
                   >
                     Summarize (Cloud)
                   </Button>
                 </TableCell>
-                <TableCell> {/* NEW: Actions cell for Local LLM */}
+                <TableCell>
                   <Button 
                     variant="text" 
                     size="small" 
-                    onClick={() => handleSummarize(doc.id, doc.filename, true)} // True for Local LLM
-                    disabled={doc.status !== 'processed_text'} // Only summarize if text is extracted
+                    onClick={() => handleSummarize(doc.id, doc.filename, true)}
+                    disabled={doc.status !== 'processed_text'}
                   >
                     Summarize (Local)
+                  </Button>
+                </TableCell>
+                <TableCell> {/* NEW: Entities cell */}
+                  <Button 
+                    variant="contained" 
+                    size="small" 
+                    onClick={() => handleViewEntities(doc.id, doc.filename)}
+                    disabled={doc.status !== 'processed_text'}
+                  >
+                    View Entities
                   </Button>
                 </TableCell>
               </TableRow>
@@ -194,6 +240,56 @@ function DocumentList() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* NEW: Entities Dialog */}
+      <Dialog open={openEntitiesDialog} onClose={handleCloseEntitiesDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Entities for: {currentDocumentNameEntities}</DialogTitle>
+        <DialogContent>
+          {entitiesLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : entitiesError ? (
+            <Typography color="error" sx={{ whiteSpace: 'pre-wrap' }}>{entitiesError}</Typography>
+          ) : (
+            <List>
+              {currentEntities.length > 0 ? (
+                currentEntities.map((entity, index) => (
+                  <React.Fragment key={entity.id || index}>
+                    <ListItem>
+                      <ListItemText
+                        primary={
+                          <Typography component="span" variant="body1" color="text.primary">
+                            {entity.text}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography
+                            sx={{ display: 'inline' }}
+                            component="span"
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            ({entity.label})
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                    {index < currentEntities.length - 1 && <Divider component="li" />}
+                  </React.Fragment>
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                  No entities found for this document.
+                </Typography>
+              )}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEntitiesDialog}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
