@@ -3,7 +3,7 @@ import {
   Box, Typography, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
   Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  List, ListItem, ListItemText, Divider, Chip // Ensure Chip is imported if not already
+  List, ListItem, ListItemText, Divider, Chip, TextField // Ensure Chip is imported if not already
 } from '@mui/material';
 
 function DocumentList() {
@@ -30,6 +30,14 @@ function DocumentList() {
   const [documentViewerLoading, setDocumentViewerLoading] = useState(false);
   const [documentViewerError, setDocumentViewerError] = useState('');
   const [currentDocNameViewer, setCurrentDocNameViewer] = useState('');
+
+//   State for Chatbot in Document Viewer
+  const [chatQuery, setChatQuery] = useState('');
+  const [chatHistory, setChatHistory] = useState([]); // Stores { type: 'user' | 'ai', message: string }
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState('');
+  const [currentChatDocumentId, setCurrentChatDocumentId] = useState(null); // To store doc ID for chat
+
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -220,6 +228,7 @@ function DocumentList() {
     setDocumentViewerLoading(true);
     setDocumentViewerError('');
     setCurrentDocNameViewer(documentFilename);
+    setCurrentChatDocumentId(documentId);
 
     try {
       // Fetch the document's full text
@@ -246,12 +255,52 @@ function DocumentList() {
     }
   };
 
+  // NEW: Handle Chatbot Query Submission
+  const handleChatSubmit = async () => {
+    if (!chatQuery.trim() || chatLoading || !currentChatDocumentId) {
+      return;
+    }
+
+    const userMessage = chatQuery.trim();
+    setChatHistory(prev => [...prev, { type: 'user', message: userMessage }]);
+    setChatQuery(''); // Clear input
+    setChatLoading(true);
+    setChatError('');
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/document/${currentChatDocumentId}/qa/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: userMessage }), // Send query as JSON
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Chatbot error: ${errorData.detail || response.statusText}`);
+      }
+      const data = await response.json();
+      setChatHistory(prev => [...prev, { type: 'ai', message: data.answer || "No answer found." }]);
+
+    } catch (e) {
+      setChatError(`Error: ${e.message}`);
+      setChatHistory(prev => [...prev, { type: 'ai', message: `Error: ${e.message}` }]);
+      console.error('Chatbot API error:', e);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // Handle closing document viewer (reset chat history)
   const handleCloseDocumentViewer = () => {
     setOpenDocumentViewer(false);
     setDocumentTextContent('');
     setDocumentViewerEntities([]);
+    setDocumentViewerLoading(false); // Ensure loading is reset
     setDocumentViewerError('');
     setCurrentDocNameViewer('');
+    setChatHistory([]); // NEW: Clear chat history
+    setChatQuery('');   // NEW: Clear chat input
+    setCurrentChatDocumentId(null); // NEW: Reset document ID
   };
 
   if (loading) {
@@ -432,17 +481,77 @@ function DocumentList() {
       {/* NEW: Document Viewer Dialog */}
       <Dialog open={openDocumentViewer} onClose={handleCloseDocumentViewer} fullWidth maxWidth="lg">
         <DialogTitle>Document Viewer: {currentDocNameViewer}</DialogTitle>
-        <DialogContent dividers sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
           {documentViewerLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4, flexGrow: 1 }}>
               <CircularProgress />
             </Box>
           ) : documentViewerError ? (
             <Typography color="error">{documentViewerError}</Typography>
           ) : (
-            documentTextContent && (
-              highlightText(documentTextContent, documentViewerEntities)
-            )
+            <React.Fragment>
+              {/* Document Text Display (scrollable) */}
+              <Box sx={{ overflowY: 'auto', flexGrow: 1, p: 2, borderBottom: '1px solid #eee' }}>
+                <Typography component="div" variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                  {highlightText(documentTextContent, documentViewerEntities)}
+                </Typography>
+              </Box>
+
+              {/* Chatbot Interface */}
+              <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: '200px', maxHeight: '40%', borderTop: '1px solid #eee', overflowY: 'auto' }}>
+                <Typography variant="h6" gutterBottom>Chat with Document</Typography>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 1 }}>
+                  {chatHistory.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">Ask me anything about this document!</Typography>
+                  ) : (
+                    chatHistory.map((msg, index) => (
+                      <Box key={index} sx={{ textAlign: msg.type === 'user' ? 'right' : 'left', mb: 1 }}>
+                        <Chip
+                          label={msg.message}
+                          color={msg.type === 'user' ? 'primary' : 'default'}
+                          sx={{
+                            maxWidth: '80%',
+                            height: 'auto',
+                            '& .MuiChip-label': {
+                              whiteSpace: 'normal',
+                              wordWrap: 'break-word',
+                              padding: '8px',
+                            },
+                          }}
+                        />
+                      </Box>
+                    ))
+                  )}
+                  {chatLoading && (
+                    <Box sx={{ textAlign: 'left', mt: 1 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  )}
+                  {chatError && (
+                    <Typography color="error" variant="body2" sx={{ mt: 1 }}>{chatError}</Typography>
+                  )}
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                  <TextField
+                    label="Your question..."
+                    variant="outlined"
+                    fullWidth
+                    size="small"
+                    value={chatQuery}
+                    onChange={(e) => setChatQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleChatSubmit();
+                      }
+                    }}
+                    disabled={chatLoading}
+                  />
+                  <Button variant="contained" onClick={handleChatSubmit} disabled={chatLoading}>
+                    Send
+                  </Button>
+                </Box>
+              </Box>
+            </React.Fragment>
           )}
         </DialogContent>
         <DialogActions>
