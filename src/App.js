@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // Import useState
+import React, { useState, useEffect } from 'react'; // Add useEffect
 import Navbar from './components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -20,6 +20,34 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
+
+  // State for documents
+  const [documents, setDocuments] = useState([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState(null);
+
+  // Fetch documents function
+  const fetchDocuments = async () => {
+    setDocumentsLoading(true);
+    setDocumentsError(null);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/documents/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+      const data = await response.json();
+      setDocuments(data);
+    } catch (err) {
+      setDocumentsError(err.message);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  // Fetch documents on initial load
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -60,7 +88,7 @@ function App() {
 
         {/* --- File Upload Section --- */}
         <Box sx={{ mb: 4, mt: 4 }}>
-          <FileUpload />
+          <FileUpload onUploadSuccess={fetchDocuments} />
         </Box>
 
         <Divider sx={{ my: 4 }} /> {/* Visual separator */}
@@ -138,7 +166,17 @@ function App() {
         <Divider sx={{ my: 4 }} /> {/* Visual separator */}
 
         {/* --- Document List Section --- */}
-        <DocumentList />
+        {documentsLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : documentsError ? (
+          <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>
+            {documentsError}
+          </Typography>
+        ) : (
+          <DocumentList documents={documents} />
+        )}
       </Container>
     </div>
   );

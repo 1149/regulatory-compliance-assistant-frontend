@@ -1,4 +1,3 @@
-// src/components/FileUpload.js
 import React, { useState } from 'react';
 import { Button, Box, Typography } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'; // For a nice upload icon
@@ -17,7 +16,7 @@ const VisuallyHiddenInput = styled('input')({
   width: 1,
 });
 
-function FileUpload() {
+function FileUpload({ onUploadSuccess }) { // <-- Accept the prop
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -53,6 +52,9 @@ function FileUpload() {
         setUploadStatus(`Upload successful: ${data.filename}`);
         // Clear selected file after successful upload
         setSelectedFile(null);
+        if (onUploadSuccess) {
+          onUploadSuccess(); // <-- Call the prop to refresh the document list
+        }
       } else {
         const errorData = await response.json();
         setUploadStatus(`Upload failed: ${errorData.detail || response.statusText}`);
