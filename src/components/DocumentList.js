@@ -3,8 +3,10 @@ import {
   Box, Typography, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
   Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  List, ListItem, ListItemText, Divider, Chip, TextField // Ensure Chip is imported if not already
+  List, ListItem, ListItemText, Divider, Chip, TextField,
+  Grid, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 function DocumentList() {
   const [documents, setDocuments] = useState([]);
@@ -478,80 +480,118 @@ function DocumentList() {
         </DialogActions>
       </Dialog>
 
-      {/* NEW: Document Viewer Dialog */}
+      {/* NEW: Document Viewer Dialog (Refined UI) */}
       <Dialog open={openDocumentViewer} onClose={handleCloseDocumentViewer} fullWidth maxWidth="lg">
         <DialogTitle>Document Viewer: {currentDocNameViewer}</DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
+        <DialogContent dividers>
           {documentViewerLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4, flexGrow: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4, height: '60vh' }}>
               <CircularProgress />
             </Box>
           ) : documentViewerError ? (
             <Typography color="error">{documentViewerError}</Typography>
           ) : (
-            <React.Fragment>
-              {/* Document Text Display (scrollable) */}
-              <Box sx={{ overflowY: 'auto', flexGrow: 1, p: 2, borderBottom: '1px solid #eee' }}>
-                <Typography component="div" variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                  {highlightText(documentTextContent, documentViewerEntities)}
-                </Typography>
-              </Box>
+            <Grid container spacing={2} sx={{ height: '80vh' }}>
+              {/* Left Column: Document Text */}
+              <Grid item xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, border: '1px solid #eee', borderRadius: 2 }}>
+                  <Typography component="div" variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.9rem', lineHeight: 1.6 }}>
+                    {highlightText(documentTextContent, documentViewerEntities)}
+                  </Typography>
+                </Box>
+              </Grid>
 
-              {/* Chatbot Interface */}
-              <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: '200px', maxHeight: '40%', borderTop: '1px solid #eee', overflowY: 'auto' }}>
-                <Typography variant="h6" gutterBottom>Chat with Document</Typography>
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 1 }}>
-                  {chatHistory.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">Ask me anything about this document!</Typography>
-                  ) : (
-                    chatHistory.map((msg, index) => (
-                      <Box key={index} sx={{ textAlign: msg.type === 'user' ? 'right' : 'left', mb: 1 }}>
-                        <Chip
-                          label={msg.message}
-                          color={msg.type === 'user' ? 'primary' : 'default'}
-                          sx={{
-                            maxWidth: '80%',
-                            height: 'auto',
-                            '& .MuiChip-label': {
-                              whiteSpace: 'normal',
-                              wordWrap: 'break-word',
-                              padding: '8px',
-                            },
-                          }}
-                        />
+              {/* Right Column: AI Insights (Chatbot and Entities) */}
+              <Grid item xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
+                {/* Chatbot Interface */}
+                <Paper sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column', maxHeight: '50%', minHeight: '50%', boxShadow: 3 }}>
+                  <Typography variant="h6" gutterBottom>Chat with Document</Typography>
+                  <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 1 }}>
+                    {chatHistory.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">Ask me anything about this document!</Typography>
+                    ) : (
+                      chatHistory.map((msg, index) => (
+                        <Box key={index} sx={{ textAlign: msg.type === 'user' ? 'right' : 'left', mb: 1 }}>
+                          <Chip
+                            label={msg.message}
+                            color={msg.type === 'user' ? 'primary' : 'default'}
+                            sx={{
+                              maxWidth: '90%',
+                              height: 'auto',
+                              '& .MuiChip-label': {
+                                whiteSpace: 'normal',
+                                wordWrap: 'break-word',
+                                padding: '8px',
+                              },
+                            }}
+                          />
+                        </Box>
+                      ))
+                    )
+                    }
+                    {chatLoading && (
+                      <Box sx={{ textAlign: 'left', mt: 1 }}>
+                        <CircularProgress size={24} />
                       </Box>
-                    ))
-                  )}
-                  {chatLoading && (
-                    <Box sx={{ textAlign: 'left', mt: 1 }}>
-                      <CircularProgress size={24} />
-                    </Box>
-                  )}
-                  {chatError && (
-                    <Typography color="error" variant="body2" sx={{ mt: 1 }}>{chatError}</Typography>
-                  )}
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                  <TextField
-                    label="Your question..."
-                    variant="outlined"
-                    fullWidth
-                    size="small"
-                    value={chatQuery}
-                    onChange={(e) => setChatQuery(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleChatSubmit();
-                      }
-                    }}
-                    disabled={chatLoading}
-                  />
-                  <Button variant="contained" onClick={handleChatSubmit} disabled={chatLoading}>
-                    Send
-                  </Button>
-                </Box>
-              </Box>
-            </React.Fragment>
+                    )}
+                    {chatError && (
+                      <Typography color="error" variant="body2" sx={{ mt: 1 }}>{chatError}</Typography>
+                    )}
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <TextField
+                      label="Your question..."
+                      variant="outlined"
+                      fullWidth
+                      size="small"
+                      value={chatQuery}
+                      onChange={(e) => setChatQuery(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleChatSubmit();
+                        }
+                      }}
+                      disabled={chatLoading}
+                    />
+                    <Button variant="contained" onClick={handleChatSubmit} disabled={chatLoading}>
+                      Send
+                    </Button>
+                  </Box>
+                </Paper>
+
+                {/* Entities & Clauses Section (Accordion) */}
+                <Accordion component={Paper} defaultExpanded sx={{ flexGrow: 1, boxShadow: 3, minHeight: 'calc(50% - 8px)' }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">Extracted Entities & Clauses</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ overflowY: 'auto', maxHeight: 'calc(100% - 48px)', p: 0 }}>
+                    <List dense>
+                      {documentViewerEntities.length > 0 ? (
+                        documentViewerEntities.map((entity, index) => (
+                          <ListItem key={entity.id || index} sx={{ py: 0.5 }}>
+                            <Chip
+                              label={entity.label}
+                              size="small"
+                              sx={{
+                                mr: 1,
+                                backgroundColor: entity.label === 'COMPLIANCE_CLAUSE' ? '#bfdfff' : '#dcfce7',
+                                color: 'text.primary',
+                                fontWeight: 'bold'
+                              }}
+                            />
+                            <ListItemText primary={entity.text} sx={{ '& .MuiListItemText-primary': { whiteSpace: 'normal', wordWrap: 'break-word' } }} />
+                          </ListItem>
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                          No entities found for this document.
+                        </Typography>
+                      )}
+                    </List>
+                  </AccordionDetails>
+                </Accordion>
+              </Grid>
+            </Grid>
           )}
         </DialogContent>
         <DialogActions>

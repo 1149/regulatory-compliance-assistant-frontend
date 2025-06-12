@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'; // Add useEffect
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import FileUpload from './components/FileUpload';
 import DocumentList from './components/DocumentList';
-// Import MUI components for search
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
@@ -12,7 +11,7 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
-import CircularProgress from '@mui/material/CircularProgress'; // For loading indicator
+import CircularProgress from '@mui/material/CircularProgress';
 
 function App() {
   // State for semantic search
@@ -25,6 +24,12 @@ function App() {
   const [documents, setDocuments] = useState([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsError, setDocumentsError] = useState(null);
+
+  // NEW: State for Policy Analyzer
+  const [userPolicyText, setUserPolicyText] = useState('');
+  const [policyAnalysisResult, setPolicyAnalysisResult] = useState(null);
+  const [policyAnalysisLoading, setPolicyAnalysisLoading] = useState(false);
+  const [policyAnalysisError, setPolicyAnalysisError] = useState(null);
 
   // Fetch documents function
   const fetchDocuments = async () => {
@@ -49,11 +54,12 @@ function App() {
     fetchDocuments();
   }, []);
 
+  // Semantic search handler
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       setSearchError(null);
-      return; // Don't search for empty query
+      return;
     }
 
     setSearchLoading(true);
@@ -61,17 +67,47 @@ function App() {
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/search/semantic/?query=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) {
-        const errorData = await response.json(); // Assuming backend sends JSON error
+        const errorData = await response.json();
         throw new Error(`Search failed: ${errorData.detail || response.statusText}`);
       }
       const data = await response.json();
       setSearchResults(data);
     } catch (error) {
       setSearchError(`Error during semantic search: ${error.message}.`);
-      console.error('Semantic search error:', error);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
+    }
+  };
+
+  // NEW: Handle Policy Analysis Submission
+  const handlePolicyAnalysis = async () => {
+    if (!userPolicyText.trim() || policyAnalysisLoading) {
+      return;
+    }
+
+    setPolicyAnalysisLoading(true);
+    setPolicyAnalysisError(null);
+    setPolicyAnalysisResult(null);
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/analyze-policy/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policy_text: userPolicyText }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Policy analysis failed: ${errorData.detail || response.statusText}`);
+      }
+      const data = await response.json();
+      setPolicyAnalysisResult(data);
+
+    } catch (error) {
+      setPolicyAnalysisError(`Error during policy analysis: ${error.message}`);
+    } finally {
+      setPolicyAnalysisLoading(false);
     }
   };
 
@@ -91,7 +127,7 @@ function App() {
           <FileUpload onUploadSuccess={fetchDocuments} />
         </Box>
 
-        <Divider sx={{ my: 4 }} /> {/* Visual separator */}
+        <Divider sx={{ my: 4 }} />
 
         {/* --- Semantic Search Section --- */}
         <Typography variant="h5" gutterBottom>
@@ -151,7 +187,6 @@ function App() {
                           >
                             Status: {doc.status} | Uploaded: {new Date(doc.upload_date).toLocaleString()}
                           </Typography>
-                          {/* You could add a small snippet of the document text or summary here later */}
                         </React.Fragment>
                       }
                     />
@@ -163,7 +198,62 @@ function App() {
           </Box>
         )}
 
-        <Divider sx={{ my: 4 }} /> {/* Visual separator */}
+        <Divider sx={{ my: 4 }} />
+
+        {/* --- NEW: Policy Analysis Section --- */}
+        <Typography variant="h5" gutterBottom>
+          Policy Compliance Analyzer
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+          <TextField
+            label="Paste your policy text here for analysis..."
+            variant="outlined"
+            multiline
+            rows={6}
+            fullWidth
+            value={userPolicyText}
+            onChange={(e) => setUserPolicyText(e.target.value)}
+          />
+          <Button variant="contained" onClick={handlePolicyAnalysis} disabled={policyAnalysisLoading}>
+            {policyAnalysisLoading ? <CircularProgress size={24} /> : 'Analyze Policy'}
+          </Button>
+        </Box>
+
+        {policyAnalysisError && (
+          <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>
+            {policyAnalysisError}
+          </Typography>
+        )}
+
+        {policyAnalysisResult && (
+          <Box sx={{ mt: 2, p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: 'background.paper' }}>
+            <Typography variant="h6" gutterBottom>Compliance Analysis Status</Typography>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+              <strong>Status:</strong> {policyAnalysisResult.status || 'N/A'}<br/>
+              <strong>Message:</strong> {policyAnalysisResult.message || 'No message'}<br/>
+              {policyAnalysisResult.received_text_length && (
+                <span><strong>Text Length:</strong> {policyAnalysisResult.received_text_length} characters</span>
+              )}
+            </Typography>
+
+            {/* This is where actual AI suggestions will go in later steps */}
+            {/* For example, if policyAnalysisResult.suggestions is an array: */}
+            {policyAnalysisResult.suggestions && policyAnalysisResult.suggestions.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>Suggested Improvements:</Typography>
+                <List dense>
+                  {policyAnalysisResult.suggestions.map((suggestion, index) => (
+                    <ListItem key={index} sx={{ borderBottom: '1px dotted #eee' }}>
+                      <ListItemText primary={suggestion} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        <Divider sx={{ my: 4 }} />
 
         {/* --- Document List Section --- */}
         {documentsLoading ? (
