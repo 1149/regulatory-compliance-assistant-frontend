@@ -1,29 +1,36 @@
 import React, { useState } from 'react';
-import { Button, Box, Typography } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload'; // For a nice upload icon
-import { styled } from '@mui/material/styles'; // For custom button styling
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import TextField from '@mui/material/TextField';
+import Alert from '@mui/material/Alert';
 
-// Styled component for the upload button (MUI's way to create custom styled elements)
-const VisuallyHiddenInput = styled('input')({
-  clip: 'rect(0 0 0 0)',
-  clipPath: 'inset(50%)',
-  height: 1,
-  overflow: 'hidden',
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  whiteSpace: 'nowrap',
-  width: 1,
-});
+const BACKEND_BASE_URL = 'http://localhost:8000';
 
-function FileUpload({ onUploadSuccess }) { // <-- Accept the prop
+function FileUpload({ onUploadSuccess }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [subject, setSubject] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (event) => {
-    if (event.target.files.length > 0) {
-      setSelectedFile(event.target.files[0]);
-      setUploadStatus(`Selected file: ${event.target.files[0].name}`);
+    const file = event.target.files[0];
+    if (file) {
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        setUploadStatus('Only PDF, Word (.doc, .docx), or TXT files are allowed!');
+        setSelectedFile(null);
+        return;
+      }
+      setSelectedFile(file);
+      setUploadStatus('');
     } else {
       setSelectedFile(null);
       setUploadStatus('');
@@ -31,65 +38,108 @@ function FileUpload({ onUploadSuccess }) { // <-- Accept the prop
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) {
-      setUploadStatus('Please select a file first!');
+    if (!selectedFile || !subject.trim()) {
+      setUploadStatus('Please select a file and enter a subject/type.');
       return;
     }
-
+    setIsUploading(true);
     setUploadStatus('Uploading...');
     const formData = new FormData();
-    formData.append('file', selectedFile); // 'file' matches the parameter name in your FastAPI endpoint
+    formData.append('file', selectedFile);
+    formData.append('subject', subject);
 
     try {
-      // IMPORTANT: Replace with your actual backend URL (e.g., http://localhost:8000/api/upload-document/)
-      const response = await fetch('http://127.0.0.1:8000/api/upload-document/', {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/upload-document/`, {
         method: 'POST',
         body: formData,
       });
-
       if (response.ok) {
-        const data = await response.json();
-        setUploadStatus(`Upload successful: ${data.filename}`);
-        // Clear selected file after successful upload
+        setUploadStatus('Upload successful!');
         setSelectedFile(null);
-        if (onUploadSuccess) {
-          onUploadSuccess(); // <-- Call the prop to refresh the document list
-        }
+        setSubject('');
+        if (onUploadSuccess) onUploadSuccess();
       } else {
-        const errorData = await response.json();
-        setUploadStatus(`Upload failed: ${errorData.detail || response.statusText}`);
+        setUploadStatus('Upload failed.');
       }
     } catch (error) {
-      setUploadStatus(`Network error: ${error.message}`);
-      console.error('Upload error:', error);
+      setUploadStatus('Upload failed.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
-    <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      <Typography variant="h6">Upload a Regulatory Document</Typography>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: 700, // Match the search UI width
+        p: { xs: 2, sm: 4 },
+        borderRadius: 4,
+        boxShadow: 3,
+        background: '#f8fafc',
+        mx: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      }}
+    >
+      <Alert
+        severity="info"
+        sx={{
+          mb: 2,
+          fontSize: '0.98rem',
+          background: '#e3f2fd',
+          color: '#1565c0',
+          borderRadius: 2,
+          alignItems: 'center'
+        }}
+      >
+        <strong>Note:</strong> Please enter a clear subject or type for your document (e.g., "HR Policy", "Data Privacy", "Employee Handbook").
+      </Alert>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <TextField
+          label="Document Subject/Type"
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          required
+          fullWidth
+          placeholder="E.g., HR Policy, Data Privacy"
+        />
+        <Button
+          component="label"
+          variant="contained"
+          startIcon={<CloudUploadIcon />}
+          sx={{ minWidth: 140, height: '56px' }}
+        >
+          {selectedFile ? selectedFile.name : 'Choose File'}
+          <input
+            type="file"
+            hidden
+            accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            onChange={handleFileChange}
+          />
+        </Button>
+      </Box>
       <Button
-        component="label" // This makes the button act as a label for the hidden input
         variant="contained"
-        startIcon={<CloudUploadIcon />}
-      >
-        {selectedFile ? selectedFile.name : 'Choose File'}
-        <VisuallyHiddenInput type="file" onChange={handleFileChange} />
-      </Button>
-      {selectedFile && (
-        <Typography variant="body2" color="text.secondary">
-          File: {selectedFile.name}
-        </Typography>
-      )}
-      <Button
-        variant="outlined"
+        color="primary"
+        sx={{ mb: 1, mt: 2, width: '100%' }}
         onClick={handleUpload}
-        disabled={!selectedFile} // Disable button if no file is selected
+        disabled={!selectedFile || !subject.trim() || isUploading}
       >
-        Upload
+        {isUploading ? 'Uploading...' : 'Upload'}
       </Button>
+      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+        <InfoOutlinedIcon color="info" sx={{ mr: 1, fontSize: 18 }} />
+        <Typography variant="caption" color="text.secondary">
+          Only PDF, Word (.doc, .docx), or TXT files are accepted
+        </Typography>
+      </Box>
       {uploadStatus && (
-        <Typography variant="body2" sx={{ mt: 2, color: uploadStatus.includes('successful') ? 'success.main' : 'error.main' }}>
+        <Typography
+          variant="body2"
+          sx={{ mt: 2, color: uploadStatus.includes('successful') ? 'success.main' : 'error.main' }}
+        >
           {uploadStatus}
         </Typography>
       )}

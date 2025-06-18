@@ -1,16 +1,28 @@
 // src/components/Navbar.js
 import React from 'react';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
 function Navbar() {
   return (
-    <nav style={{ background: '#333', color: '#fff', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <h1 style={{ margin: 0 }}>Compliance Assistant</h1>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex' }}>
-        <li style={{ marginLeft: '20px' }}><a href="#" style={{ color: '#fff', textDecoration: 'none' }}>Home</a></li>
-        <li style={{ marginLeft: '20px' }}><a href="#" style={{ color: '#fff', textDecoration: 'none' }}>Documents</a></li>
-        <li style={{ marginLeft: '20px' }}><a href="#" style={{ color: '#fff', textDecoration: 'none' }}>Settings</a></li>
-      </ul>
-    </nav>
+    <AppBar position="static" sx={{ background: '#23272f' }}>
+      <Toolbar>
+        <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
+          Compliance Assistant
+        </Typography>
+        {/* Only show Uploaded Documents, remove Home and Settings */}
+        <Button
+          color="inherit"
+          startIcon={<InsertDriveFileIcon sx={{ fontSize: 28 }} />}
+          sx={{ fontSize: 18, textTransform: 'none', ml: 2 }}
+        >
+          Uploaded Documents
+        </Button>
+      </Toolbar>
+    </AppBar>
   );
 }
 
