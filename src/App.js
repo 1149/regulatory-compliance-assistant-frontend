@@ -3,13 +3,10 @@ import Navbar from './components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import FileUpload from './components/FileUpload';
-import DocumentList from './components/DocumentList';
+import DocumentLibrary from './components/DocumentLibrary';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import SearchIcon from '@mui/icons-material/Search';
@@ -19,48 +16,23 @@ import Paper from '@mui/material/Paper';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Alert from '@mui/material/Alert';
+import { marked } from 'marked';
 
 function App() {
   // State for semantic search
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);  const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchExecuted, setSearchExecuted] = useState(false); // NEW: Track if search was executed
-
-  // State for documents
-  const [documents, setDocuments] = useState([]);
-  const [documentsLoading, setDocumentsLoading] = useState(false);
-  const [documentsError, setDocumentsError] = useState(null);
 
   // NEW: State for Policy Analyzer
   const [userPolicyText, setUserPolicyText] = useState('');
   const [policyAnalysisResult, setPolicyAnalysisResult] = useState(null);
   const [policyAnalysisLoading, setPolicyAnalysisLoading] = useState(false);
   const [policyAnalysisError, setPolicyAnalysisError] = useState(null);
-
-  // Fetch documents function
-  const fetchDocuments = async () => {
-    setDocumentsLoading(true);
-    setDocumentsError(null);
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/documents/');
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
-      }
-      const data = await response.json();
-      setDocuments(data);
-    } catch (err) {
-      setDocumentsError(err.message);
-    } finally {
-      setDocumentsLoading(false);
-    }
-  };
-
-  // Fetch documents on initial load
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
+  const [loadingText, setLoadingText] = useState('🔍 Analyzing policy structure...');
+  // State to trigger refresh of DocumentLibrary after upload
+  const [refreshDocs, setRefreshDocs] = useState(false);
 
   // Semantic search handler
   const handleSearch = async () => {
@@ -88,9 +60,7 @@ function App() {
       setSearchLoading(false);
       setSearchExecuted(true); // Mark search as executed
     }
-  };
-
-  // NEW: Handle Policy Analysis Submission
+  };  // NEW: Handle Policy Analysis Submission with innovative loading
   const handlePolicyAnalysis = async () => {
     if (!userPolicyText.trim() || policyAnalysisLoading) {
       return;
@@ -99,6 +69,27 @@ function App() {
     setPolicyAnalysisLoading(true);
     setPolicyAnalysisError(null);
     setPolicyAnalysisResult(null);
+
+    // Loading stages for innovative UI
+    const loadingStages = [
+      { text: "🔍 Analyzing policy structure...", duration: 1000 },
+      { text: "🤖 AI is reviewing compliance requirements...", duration: 2000 },
+      { text: "📋 Identifying gaps and recommendations...", duration: 1500 },
+      { text: "✨ Finalizing your personalized report...", duration: 500 }
+    ];
+
+    let currentStage = 0;
+    setLoadingText(loadingStages[0].text);
+
+    // Simulate progressive loading stages
+    const stageInterval = setInterval(() => {
+      currentStage++;
+      if (currentStage < loadingStages.length) {
+        setLoadingText(loadingStages[currentStage].text);
+      } else {
+        clearInterval(stageInterval);
+      }
+    }, 1000);
 
     try {
       const response = await fetch('http://127.0.0.1:8000/api/analyze-policy/', {
@@ -112,13 +103,23 @@ function App() {
         throw new Error(`Policy analysis failed: ${errorData.detail || response.statusText}`);
       }
       const data = await response.json();
+      
+      // Clear the interval when done
+      clearInterval(stageInterval);
+      
       setPolicyAnalysisResult(data);
 
     } catch (error) {
+      clearInterval(stageInterval);
       setPolicyAnalysisError(`Error during policy analysis: ${error.message}`);
     } finally {
       setPolicyAnalysisLoading(false);
     }
+  };
+
+  // Callback to refresh documents after upload
+  const handleUploadSuccess = () => {
+    setRefreshDocs((prev) => !prev);
   };
 
   return (
@@ -168,8 +169,16 @@ function App() {
         </Typography>
 
         {/* --- File Upload Section --- */}
-        <Box sx={{ mb: 4, mt: 4 }}>
-          <FileUpload onUploadSuccess={fetchDocuments} />
+        <Box
+          sx={{
+            mb: 4,
+            mt: 4,
+            width: '100%',        // Fill the container horizontally
+            maxWidth: 'none',     // Remove maxWidth restriction
+            mx: 0,                // Remove horizontal auto margin
+          }}
+        >
+          <FileUpload onUploadSuccess={handleUploadSuccess} />
         </Box>
 
         <Divider sx={{ my: 4 }} />
@@ -184,26 +193,44 @@ function App() {
             borderRadius: 4,
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)',
             border: '1px solid #e0e3e7',
-            maxWidth: 700,
-            mx: 'auto',
+            width: '100%',           // Make it fill the container horizontally
+            maxWidth: 'none',        // Remove maxWidth restriction
+            mx: 0,                   // Remove horizontal auto margin
           }}
         >
           <Typography
             variant="h5"
-            gutterBottom
             sx={{
               fontWeight: 700,
-              color: '#1976d2',
+              color: 'primary.main',
               letterSpacing: 1,
               mb: 3,
               textAlign: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              fontFamily: `'Montserrat', 'Segoe UI', 'Roboto', 'Arial', sans-serif`,
+              textShadow: '0 2px 8px rgba(25,118,210,0.10)',
+              borderBottom: '2px solid',
+              borderColor: 'divider',
+              pb: 1,
+              background: 'transparent',
+              fontSize: { xs: '1.5rem', sm: '1.8rem', md: '2rem' },
+              textTransform: 'uppercase',
             }}
           >
-            <SearchIcon sx={{ mr: 1, verticalAlign: 'middle', fontSize: 30, color: '#1976d2' }} />
+            <SearchIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main', fontSize: 28 }} />
             Semantic Search
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              color: 'info.main',
+              textAlign: 'center',
+              mb: 3,
+              fontStyle: 'italic',
+              letterSpacing: 0.2,
+            }}
+          >
+            Note: This project is a personal side project for learning and demonstration purposes only. Features and results are for demo use and not intended for production.
           </Typography>
           <Box
             sx={{
@@ -307,8 +334,9 @@ function App() {
             borderRadius: 4,
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)',
             border: '1px solid #e0e3e7',
-            maxWidth: 700,
-            mx: 'auto',
+            width: '100%',           // Make it fill the container horizontally
+            maxWidth: 'none',        // Remove maxWidth restriction
+            mx: 0,                   // Remove horizontal auto margin
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -363,68 +391,233 @@ function App() {
               },
               mb: 2,
             }}
-            endIcon={<AssignmentTurnedInIcon />}
-          >
-            {policyAnalysisLoading ? <CircularProgress size={24} /> : 'Analyze Policy'}
+            endIcon={<AssignmentTurnedInIcon />}          >
+            {policyAnalysisLoading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={20} sx={{ color: 'white' }} />
+                <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
+                  {loadingText}
+                </Typography>
+              </Box>
+            ) : (
+              'Analyze Policy'
+            )}
           </Button>
+          
+          {/* Loading Stage Indicator */}
+          {policyAnalysisLoading && (
+            <Box sx={{ 
+              mb: 2, 
+              p: 2, 
+              bgcolor: '#f3e5f5', 
+              borderRadius: 2, 
+              border: '1px solid #e1bee7',
+              textAlign: 'center'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#7b1fa2', 
+                fontWeight: 600,
+                fontSize: '1rem',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }}>
+                {loadingText}
+              </Typography>
+              <Typography variant="caption" sx={{ 
+                color: '#9c27b0', 
+                mt: 1, 
+                display: 'block',
+                fontStyle: 'italic'
+              }}>
+                🧠 Our AI is working hard to give you the best insights...
+              </Typography>
+            </Box>
+          )}
+          
           {policyAnalysisError && (
             <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>
               {policyAnalysisError}
             </Typography>
-          )}
-          {policyAnalysisResult && (
+          )}{policyAnalysisResult && (
             <Box
               sx={{
                 mt: 2,
-                p: 2,
+                p: 3,
                 border: '1px solid #c8e6c9',
-                borderRadius: 2,
+                borderRadius: 3,
                 bgcolor: '#f1f8e9',
-                boxShadow: '0 1px 4px 0 rgba(56, 142, 60, 0.07)',
+                boxShadow: '0 2px 8px 0 rgba(56, 142, 60, 0.1)',
               }}
             >
-              <Typography variant="h6" gutterBottom sx={{ color: '#388e3c', fontWeight: 600 }}>
-                Compliance Analysis Status
+              <Typography variant="h6" gutterBottom sx={{ color: '#388e3c', fontWeight: 600, mb: 2 }}>
+                📋 Policy Analysis Complete
               </Typography>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 1 }}>
-                <strong>Status:</strong> {policyAnalysisResult.status || 'N/A'}<br />
-                <strong>Message:</strong> {policyAnalysisResult.message || 'No message'}<br />
-                {policyAnalysisResult.received_text_length && (
-                  <span><strong>Text Length:</strong> {policyAnalysisResult.received_text_length} characters</span>
-                )}
-              </Typography>
-              {policyAnalysisResult.suggestions && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ color: '#1976d2', fontWeight: 600 }}>
-                    AI-Generated Suggestions
+              
+              {/* Metadata Summary */}
+              {policyAnalysisResult.metadata && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: '#fff', borderRadius: 2, border: '1px solid #e0e0e0' }}>
+                  <Typography variant="subtitle2" sx={{ color: '#1976d2', fontWeight: 600, mb: 1 }}>
+                    Analysis Summary
                   </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {policyAnalysisResult.suggestions}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+                    <Typography variant="body2">
+                      <strong>Overall Score:</strong> {policyAnalysisResult.metadata.overall_compliance_score}/10
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Word Count:</strong> {policyAnalysisResult.metadata.word_count?.toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Status:</strong> <span style={{ color: '#4caf50' }}>{policyAnalysisResult.status}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Analyzed:</strong> {new Date(policyAnalysisResult.metadata.analysis_timestamp).toLocaleString()}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}              {/* Main Analysis */}
+              <Box sx={{ mb: 2, p: 3, bgcolor: '#fff', borderRadius: 2, border: '1px solid #e0e0e0' }}>                <Typography variant="h5" sx={{ color: '#1976d2', fontWeight: 600, mb: 3, fontSize: '1.5rem' }}>
+                  📊 Policy Review & Recommendations
+                </Typography><Box 
+                  sx={{ 
+                    '& .analysis-content': {
+                      fontFamily: '"Segoe UI", "Roboto", "Arial", sans-serif',
+                      lineHeight: 1.6,
+                      fontSize: '0.95rem'
+                    },
+                    '& .analysis-content h2': { 
+                      fontSize: '1.1rem', 
+                      fontWeight: 600, 
+                      color: '#1976d2', 
+                      marginTop: '16px', 
+                      marginBottom: '8px',
+                      borderBottom: '2px solid #e3f2fd',
+                      paddingBottom: '4px'
+                    },
+                    '& .analysis-content h3': { 
+                      fontSize: '1rem', 
+                      fontWeight: 600, 
+                      color: '#388e3c', 
+                      marginTop: '12px', 
+                      marginBottom: '8px' 
+                    },
+                    '& .analysis-content p': { 
+                      marginBottom: '12px',
+                      lineHeight: 1.6
+                    },
+                    '& .analysis-content ul': { 
+                      paddingLeft: '20px', 
+                      marginBottom: '12px' 
+                    },
+                    '& .analysis-content ol': { 
+                      paddingLeft: '20px', 
+                      marginBottom: '12px' 
+                    },
+                    '& .analysis-content li': { 
+                      marginBottom: '4px',
+                      lineHeight: 1.5
+                    },
+                    '& .analysis-content strong': { 
+                      fontWeight: 600, 
+                      color: '#1565c0' 
+                    }
+                  }}
+                >
+                  <div 
+                    className="analysis-content"
+                    dangerouslySetInnerHTML={{ 
+                      __html: marked.parse(policyAnalysisResult.analysis, {
+                        breaks: true,
+                        gfm: true
+                      })
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Recommendations Summary */}
+              {policyAnalysisResult.recommendations_summary && (
+                <Box sx={{ p: 2, bgcolor: '#fff3e0', borderRadius: 2, border: '1px solid #ffcc02' }}>
+                  <Typography variant="subtitle2" sx={{ color: '#f57c00', fontWeight: 600, mb: 1 }}>
+                    🚀 Next Steps
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>High Priority:</strong> {policyAnalysisResult.recommendations_summary.high_priority}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Next Steps:</strong> {policyAnalysisResult.recommendations_summary.next_steps}
                   </Typography>
                 </Box>
               )}
+
+              {/* Action Buttons */}
+              <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const analysisText = `
+POLICY ANALYSIS REPORT
+Generated: ${new Date().toLocaleString()}
+
+${policyAnalysisResult.analysis}
+
+---
+Analysis Summary:
+- Overall Compliance Score: ${policyAnalysisResult.metadata?.overall_compliance_score}/10
+- Word Count: ${policyAnalysisResult.metadata?.word_count}
+- Status: ${policyAnalysisResult.status}
+                    `.trim();
+                    navigator.clipboard.writeText(analysisText);
+                    alert('Analysis copied to clipboard!');
+                  }}
+                >
+                  📋 Copy Analysis
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="secondary"
+                  onClick={() => {
+                    setPolicyAnalysisResult(null);
+                    setUserPolicyText('');
+                  }}
+                >
+                  🔄 New Analysis
+                </Button>
+              </Box>
             </Box>
           )}
-        </Paper>
-
-        <Divider sx={{ my: 4 }} />
+        </Paper>        <Divider sx={{ my: 4 }} />
 
         {/* --- Document List Section --- */}
-        {documentsLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : documentsError ? (
-          <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>
-            {documentsError}
-          </Typography>
-        ) : (
-          <DocumentList documents={documents} />
-        )}
-      </Container>
+        <DocumentLibrary refresh={refreshDocs} /></Container>
+      
+      {/* CSS Animations for loading */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.7;
+              transform: scale(1.02);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+        `}
+      </style>
+      
       {/* Add Google Fonts link for Dancing Script */}
       <link
         href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap"
+        rel="stylesheet"
+      />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap"
         rel="stylesheet"
       />
     </Box>
