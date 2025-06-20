@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -9,23 +9,13 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
-import SearchIcon from '@mui/icons-material/Search';
-import InputAdornment from '@mui/material/InputAdornment';
-import Fade from '@mui/material/Fade';
 import Paper from '@mui/material/Paper';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Alert from '@mui/material/Alert';
 import { marked } from 'marked';
 
-function App() {
-  // State for semantic search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState(null);
-  const [searchExecuted, setSearchExecuted] = useState(false); // NEW: Track if search was executed
-
-  // NEW: State for Policy Analyzer
+function App() {  // NEW: State for Policy Analyzer
   const [userPolicyText, setUserPolicyText] = useState('');
   const [policyAnalysisResult, setPolicyAnalysisResult] = useState(null);
   const [policyAnalysisLoading, setPolicyAnalysisLoading] = useState(false);
@@ -33,34 +23,7 @@ function App() {
   const [loadingText, setLoadingText] = useState('🔍 Analyzing policy structure...');
   // State to trigger refresh of DocumentLibrary after upload
   const [refreshDocs, setRefreshDocs] = useState(false);
-
-  // Semantic search handler
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setSearchError(null);
-      return;
-    }
-
-    setSearchLoading(true);
-    setSearchError(null);
-    setSearchExecuted(false); // Reset executed state on new search
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/api/search/semantic/?query=${encodeURIComponent(searchQuery)}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Search failed: ${errorData.detail || response.statusText}`);
-      }
-      const data = await response.json();
-      setSearchResults(data);
-    } catch (error) {
-      setSearchError(`Error during semantic search: ${error.message}.`);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-      setSearchExecuted(true); // Mark search as executed
-    }
-  };  // NEW: Handle Policy Analysis Submission with innovative loading
+  // NEW: Handle Policy Analysis Submission with innovative loading
   const handlePolicyAnalysis = async () => {
     if (!userPolicyText.trim() || policyAnalysisLoading) {
       return;
@@ -121,16 +84,324 @@ function App() {
   const handleUploadSuccess = () => {
     setRefreshDocs((prev) => !prev);
   };
-
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #e9ecef 0%, #f5f7fa 100%)',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
+        position: 'relative',
+        overflow: 'hidden',
       }}
-    >
+    >      {/* Video Background */}
+      <Box
+        component="video"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          zIndex: -2,
+          opacity: 0.6, // Adjust opacity for better text readability
+          filter: 'brightness(0.8) contrast(1.1)', // Enhance video contrast
+        }}
+        onError={(e) => {
+          // Fallback if video fails to load
+          e.target.style.display = 'none';
+        }}
+      >
+        <source src="/background-animation.mp4" type="video/mp4" />
+        {/* Fallback background if video doesn't load */}
+      </Box>
+      
+      {/* Fallback Background (shown if video fails) */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          zIndex: -3,
+        }}
+      />
+      
+      {/* Dark Overlay for Better Text Contrast */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.3) 0%, rgba(45, 45, 45, 0.2) 50%, rgba(30, 30, 30, 0.4) 100%)',
+          zIndex: -1,
+        }}      />
+        {/* Watermark Logo */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: { xs: 10, sm: 20 }, // Responsive positioning
+          right: { xs: 10, sm: 20 },
+          zIndex: 1000,
+          opacity: { xs: 0.1, sm: 0.15 }, // Less opacity on mobile
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            opacity: 0.4,
+            transform: 'scale(1.02)',
+          },
+        }}
+      >        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(100, 181, 246, 0.05) 100%)',
+            backdropFilter: 'blur(15px)',
+            borderRadius: 4,
+            p: { xs: 1.5, sm: 2.5 },
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+            }
+          }}>{/* Custom SVG Logo */}
+          <Box
+            sx={{
+              width: { xs: 50, sm: 60 },
+              height: { xs: 50, sm: 60 },
+              mb: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+              transition: 'transform 0.3s ease',
+              '&:hover': {
+                transform: 'scale(1.1) rotate(5deg)',
+              }
+            }}
+          >
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 100 100"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* Rotating Outer Ring */}
+              <circle
+                cx="50"
+                cy="50"
+                r="45"
+                fill="none"
+                stroke="url(#watermarkOuterGradient)"
+                strokeWidth="2"
+                strokeDasharray="8 4"
+                opacity="0.7"
+              >
+                <animateTransform
+                  attributeName="transform"
+                  attributeType="XML"
+                  type="rotate"
+                  from="0 50 50"
+                  to="360 50 50"
+                  dur="25s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+              
+              {/* Static Outer Ring */}
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke="url(#watermarkStaticRing)"
+                strokeWidth="1"
+                opacity="0.6"
+              />
+              
+              {/* Inner Background Circle */}
+              <circle
+                cx="50"
+                cy="50"
+                r="35"
+                fill="url(#watermarkBackgroundGradient)"
+                stroke="url(#watermarkBorderGradient)"
+                strokeWidth="1"
+                opacity="0.8"
+              />
+              
+              {/* Compass Points */}
+              <g opacity="0.9">
+                {/* North Point */}
+                <polygon
+                  points="50,12 53,30 50,35 47,30"
+                  fill="url(#watermarkPointGradient)"
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth="0.5"
+                />
+                {/* South Point */}
+                <polygon
+                  points="50,88 53,70 50,65 47,70"
+                  fill="url(#watermarkPointGradient)"
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth="0.5"
+                />
+                {/* East Point */}
+                <polygon
+                  points="88,50 70,47 65,50 70,53"
+                  fill="url(#watermarkPointGradient)"
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth="0.5"
+                />
+                {/* West Point */}
+                <polygon
+                  points="12,50 30,47 35,50 30,53"
+                  fill="url(#watermarkPointGradient)"
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth="0.5"
+                />
+              </g>
+              
+              {/* Center Circle with Checkmark */}
+              <circle
+                cx="50"
+                cy="50"
+                r="18"
+                fill="url(#watermarkCenterGradient)"
+                stroke="rgba(255,255,255,0.8)"
+                strokeWidth="2"
+                opacity="0.9"
+              />
+              
+              {/* Checkmark */}
+              <path
+                d="M43 50 L47 54 L57 44"
+                fill="none"
+                stroke="rgba(255,255,255,0.9)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              
+              {/* Subtle inner glow */}
+              <circle
+                cx="50"
+                cy="50"
+                r="15"
+                fill="none"
+                stroke="rgba(255,255,255,0.2)"
+                strokeWidth="1"
+                opacity="0.5"
+              />
+              
+              {/* Gradient Definitions for Watermark */}
+              <defs>
+                <linearGradient id="watermarkOuterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.7)" />
+                  <stop offset="50%" stopColor="rgba(100,181,246,0.5)" />
+                  <stop offset="100%" stopColor="rgba(25,118,210,0.3)" />
+                </linearGradient>
+                
+                <linearGradient id="watermarkStaticRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
+                  <stop offset="100%" stopColor="rgba(227,242,253,0.4)" />
+                </linearGradient>
+                
+                <radialGradient id="watermarkBackgroundGradient" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="70%" stopColor="rgba(100,181,246,0.15)" />
+                  <stop offset="100%" stopColor="rgba(25,118,210,0.1)" />
+                </radialGradient>
+                
+                <linearGradient id="watermarkBorderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
+                  <stop offset="100%" stopColor="rgba(100,181,246,0.3)" />
+                </linearGradient>
+                
+                <linearGradient id="watermarkPointGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="50%" stopColor="rgba(227,242,253,0.6)" />
+                  <stop offset="100%" stopColor="rgba(187,222,251,0.4)" />
+                </linearGradient>
+                
+                <radialGradient id="watermarkCenterGradient" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="rgba(102,187,106,0.8)" />
+                  <stop offset="100%" stopColor="rgba(46,125,50,0.6)" />
+                </radialGradient>
+              </defs>
+            </svg>
+          </Box>
+          {/* Logo Text */}
+          <Box sx={{ textAlign: 'center' }}>            <Typography
+              variant="caption"
+              sx={{
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.7rem',
+                letterSpacing: '1px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                lineHeight: 1.2,
+              }}
+            >
+              COMPLIANCE
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.7rem',
+                letterSpacing: '1px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                lineHeight: 1.2,
+                display: 'block',
+              }}
+            >
+              NAVIGATOR
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: '#64b5f6',
+                fontWeight: 600,
+                fontSize: '0.65rem',
+                letterSpacing: '0.8px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                lineHeight: 1.2,
+                display: 'block',
+                mt: 0.5,
+                textTransform: 'uppercase',
+              }}
+            >
+              RegGuide Platform
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+      
+      {/* Content Layer */}
+      <Box
+        sx={{
+          position: 'relative',
+          zIndex: 1,
+          minHeight: '100vh',
+        }}
+      >
       <Navbar />
       <Container
         component="main"
@@ -179,161 +450,18 @@ function App() {
           }}
         >
           <FileUpload onUploadSuccess={handleUploadSuccess} />
-        </Box>
+        </Box>        <Divider sx={{ my: 4 }} />
 
-        <Divider sx={{ my: 4 }} />
-
-        {/* --- Semantic Search Section (professional look) --- */}
-        <Paper
-          elevation={6}
-          sx={{
-            p: { xs: 2, sm: 4 },
-            mb: 6,
-            background: '#f4f6f8',
-            borderRadius: 4,
-            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)',
-            border: '1px solid #e0e3e7',
-            width: '100%',           // Make it fill the container horizontally
-            maxWidth: 'none',        // Remove maxWidth restriction
-            mx: 0,                   // Remove horizontal auto margin
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 700,
-              color: 'primary.main',
-              letterSpacing: 1,
-              mb: 3,
-              textAlign: 'center',
-              fontFamily: `'Montserrat', 'Segoe UI', 'Roboto', 'Arial', sans-serif`,
-              textShadow: '0 2px 8px rgba(25,118,210,0.10)',
-              borderBottom: '2px solid',
-              borderColor: 'divider',
-              pb: 1,
-              background: 'transparent',
-              fontSize: { xs: '1.5rem', sm: '1.8rem', md: '2rem' },
-              textTransform: 'uppercase',
-            }}
-          >
-            <SearchIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main', fontSize: 28 }} />
-            Semantic Search
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              color: 'info.main',
-              textAlign: 'center',
-              mb: 3,
-              fontStyle: 'italic',
-              letterSpacing: 0.2,
-            }}
-          >
-            Note: This project is a personal side project for learning and demonstration purposes only. Features and results are for demo use and not intended for production.
-          </Typography>
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 2,
-              mb: 3,
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-            }}
-          >
-            <TextField
-              label="Search documents by meaning..."
-              variant="outlined"
-              fullWidth
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" />
-                  </InputAdornment>
-                ),
-                sx: {
-                  borderRadius: 2,
-                  background: '#fff',
-                  fontSize: '1.08rem',
-                  fontFamily: 'inherit',
-                  boxShadow: '0 1px 4px 0 rgba(25, 118, 210, 0.07)',
-                },
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={handleSearch}
-              disabled={searchLoading}
-              sx={{
-                px: 4,
-                py: 1.5,
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: '1.08rem',
-                background: '#1976d2',
-                boxShadow: '0 2px 8px 0 rgba(25, 118, 210, 0.10)',
-                '&:hover': {
-                  background: '#115293',
-                },
-                height: '56px',
-              }}
-              endIcon={<SearchIcon />}
-            >
-              {searchLoading ? <CircularProgress size={24} /> : 'Search'}
-            </Button>
-          </Box>
-
-          {searchError && (
-            <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>
-              {searchError}
-            </Typography>
-          )}
-
-          <Fade in={searchExecuted && !searchLoading && searchResults.length === 0}>
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
-              No results found for your query.
-            </Typography>
-          </Fade>
-
-          <Fade in={searchResults.length > 0}>
-            <Box>
-              <Typography variant="subtitle1" sx={{ mb: 1, color: '#1976d2', fontWeight: 600 }}>
-                Results
-              </Typography>
-              {searchResults.map((doc) => (
-                <Paper key={doc.id} sx={{ p: 2, mb: 2, background: '#e3f2fd', borderRadius: 2 }}>
-                  <Typography variant="subtitle2" sx={{ color: '#1976d2', fontWeight: 600 }}>
-                    {doc.filename} ({doc.subject || 'Uncategorized'})
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Status: {doc.status} | Uploaded: {new Date(doc.upload_date).toLocaleString()}
-                  </Typography>
-                </Paper>
-              ))}
-            </Box>
-          </Fade>
-        </Paper>
-
-        <Divider sx={{ my: 4 }} />
-
-        {/* --- Policy Analysis Section (Enhanced Professional UI) --- */}
-        <Paper
+        {/* --- Policy Analysis Section (Enhanced Professional UI) --- */}        <Paper
           elevation={6}
           sx={{
             mt: 6,
             p: { xs: 2, sm: 4 },
-            background: '#f4f6f8',
+            background: 'rgba(244, 246, 248, 0.95)', // Semi-transparent background
+            backdropFilter: 'blur(15px)', // Glass effect
             borderRadius: 4,
-            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)',
-            border: '1px solid #e0e3e7',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.20)',
+            border: '1px solid rgba(224, 227, 231, 0.5)',
             width: '100%',           // Make it fill the container horizontally
             maxWidth: 'none',        // Remove maxWidth restriction
             mx: 0,                   // Remove horizontal auto margin
@@ -618,8 +746,8 @@ Analysis Summary:
       />
       <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap"
-        rel="stylesheet"
-      />
+        rel="stylesheet"      />
+      </Box>
     </Box>
   );
 }

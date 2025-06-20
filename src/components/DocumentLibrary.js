@@ -22,6 +22,9 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  InputAdornment,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -36,6 +39,8 @@ import SendIcon from '@mui/icons-material/Send';
 import CloseIcon from '@mui/icons-material/Close';
 import FolderIcon from '@mui/icons-material/Folder';
 import SearchIcon from '@mui/icons-material/Search';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
 
@@ -76,13 +81,21 @@ function DocumentLibrary({ refresh }) {
   const [summaryType, setSummaryType] = useState(''); // 'cloud' or 'local'
   const [summaryDocumentName, setSummaryDocumentName] = useState('');  // Entities dialog states
   const [entitiesDialogOpen, setEntitiesDialogOpen] = useState(false);
-  const [entitiesContent, setEntitiesContent] = useState([]);
-  const [entitiesDocumentName, setEntitiesDocumentName] = useState('');
-  // Semantic search states
+  const [entitiesContent, setEntitiesContent] = useState([]);  const [entitiesDocumentName, setEntitiesDocumentName] = useState('');
+  // Search states for integrated search within uploaded documents
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchDialogOpen, setSearchDialogOpen] = useState(false);// Helper function to group documents by subject
+  const [searchError, setSearchError] = useState('');  const [lastSearchQuery, setLastSearchQuery] = useState(''); // Track what was searched  // Delete confirmation dialog states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  // Notification states
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationSeverity, setNotificationSeverity] = useState('success'); // 'success' | 'error'
+
+  // Helper function to group documents by subject
   const groupDocumentsBySubject = (documents) => {
     const grouped = {};
     // Add safety check for documents array and filter out null/undefined items
@@ -130,16 +143,47 @@ function DocumentLibrary({ refresh }) {
 
   const handleExpandClick = (id) => {
     setExpandedId(expandedId === id ? null : id);
+  };  const handleDelete = async (id) => {
+    const document = documents.find(doc => doc.id === id);
+    setDocumentToDelete(document);
+    setDeleteConfirmOpen(true);
   };
-
-  const handleDelete = async (id) => {
+  const handleConfirmDelete = async () => {
+    if (!documentToDelete) return;
+    
+    setDeleteLoading(true);
     try {
-      await fetch(`${BACKEND_BASE_URL}/api/documents/${id}/`, { method: 'DELETE' });
-      setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+      const response = await fetch(`${BACKEND_BASE_URL}/api/documents/${documentToDelete.id}/`, { method: 'DELETE' });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete document: ${response.status} ${response.statusText}`);
+      }
+      
+      setDocuments((prev) => prev.filter((doc) => doc.id !== documentToDelete.id));
+      
+      // Close dialog and reset state
+      setDeleteConfirmOpen(false);
+      setDocumentToDelete(null);
+      
+      // Show success notification
+      setNotificationMessage(`Document "${documentToDelete.filename}" deleted successfully!`);
+      setNotificationSeverity('success');
+      setNotificationOpen(true);
     } catch (error) {
       console.error('Error deleting document:', error);
-      alert('Failed to delete document. Please try again.');
+      // Show error notification
+      setNotificationMessage(`Failed to delete document: ${error.message}`);
+      setNotificationSeverity('error');
+      setNotificationOpen(true);
+    } finally {
+      setDeleteLoading(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setDocumentToDelete(null);
+    setDeleteLoading(false);
   };
   const handleSummarizeCloud = async (docId) => {
     setSummaryLoading(prev => ({ ...prev, [docId]: true }));
@@ -270,145 +314,8 @@ function DocumentLibrary({ refresh }) {
     setSummaryDocumentName('');
   };
   const handleCloseEntitiesDialog = () => {
-    setEntitiesDialogOpen(false);
-    setEntitiesContent([]);    setEntitiesDocumentName('');
-  };
-
-  // Semantic search functions
-  const handleSemanticSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
-    setSearchLoading(true);
-    setSearchResults([]);
-    
-    try {
-      const query = searchQuery.toLowerCase();
-      const results = [];
-      
-      for (const doc of documents) {
-        if (!doc || !doc.id) continue;
-        
-        let relevanceScore = 0;
-        let matchedContent = '';
-        let contentPreview = '';
-        let matchContext = '';
-        
-        // Check filename match (higher weight)
-        if (doc.filename && doc.filename.toLowerCase().includes(query)) {
-          relevanceScore += 0.9;
-          matchedContent += `📄 Filename: "${doc.filename}"\n`;
-        }
-        
-        // Check subject match (high weight)
-        if (doc.subject && doc.subject.toLowerCase().includes(query)) {
-          relevanceScore += 0.85;
-          matchedContent += `🏷️ Subject: "${doc.subject}"\n`;        }
-        
-        // Try to get document content and search within it
-        try {
-          const textResponse = await fetch(`${BACKEND_BASE_URL}/api/documents/${doc.id}/text`);
-          if (textResponse.ok) {
-            const documentText = await textResponse.text();
-            const lowerText = documentText.toLowerCase();
-            
-            // Direct query match in content (highest weight)
-            if (lowerText.includes(query)) {
-              relevanceScore += 1.0;
-              
-              // Extract relevant snippet with context
-              const queryIndex = lowerText.indexOf(query);
-              const contextStart = Math.max(0, queryIndex - 150);
-              const contextEnd = Math.min(documentText.length, queryIndex + query.length + 150);
-              const snippet = documentText.substring(contextStart, contextEnd).trim();
-              
-              // Highlight the matched term
-              const originalSnippet = documentText.substring(contextStart, contextEnd);
-              const highlightedSnippet = originalSnippet.replace(
-                new RegExp(query, 'gi'), 
-                `**${query.toUpperCase()}**`
-              );
-              
-              matchedContent += `📝 Content match found\n`;
-              contentPreview = `...${highlightedSnippet}...`;
-              matchContext = snippet;
-            }
-            
-            // Search for individual keywords if no direct match
-            if (relevanceScore < 1.0) {
-              const keywords = query.split(' ').filter(word => word.length > 2);
-              let keywordMatches = 0;
-              
-              for (const keyword of keywords) {
-                if (lowerText.includes(keyword.toLowerCase())) {
-                  keywordMatches++;
-                  relevanceScore += 0.3;
-                  
-                  // Get context for first keyword if no previous context
-                  if (!matchContext) {
-                    const keywordIndex = lowerText.indexOf(keyword.toLowerCase());
-                    const contextStart = Math.max(0, keywordIndex - 100);
-                    const contextEnd = Math.min(documentText.length, keywordIndex + keyword.length + 100);
-                    matchContext = documentText.substring(contextStart, contextEnd).trim();
-                    contentPreview = `...${matchContext}...`;
-                  }
-                }
-              }
-              
-              if (keywordMatches > 0) {
-                matchedContent += `🔍 ${keywordMatches} keyword${keywordMatches > 1 ? 's' : ''} found\n`;
-              }
-            }
-          }
-        } catch (error) {
-          console.warn(`Could not fetch content for document ${doc.id}:`, error);
-        }
-        
-        // If we have any matches, add to results
-        if (relevanceScore > 0) {
-          // Create default preview if no content preview
-          if (!contentPreview) {
-            contentPreview = `Document: ${doc.filename} | Subject: ${doc.subject || 'Uncategorized'} | Uploaded: ${formatDateTime(doc.upload_date)}`;
-          }
-          
-          results.push({
-            document_id: doc.id,
-            document: doc, // Include full document object
-            similarity: Math.min(relevanceScore, 1.0),
-            content: matchedContent || `Document contains information related to "${searchQuery}"`,
-            text: contentPreview,
-            context: matchContext,
-            preview: contentPreview
-          });
-        }
-      }
-        // Sort by relevance score (highest first)
-      results.sort((a, b) => b.similarity - a.similarity);
-      
-      setSearchResults(results);
-      setSearchDialogOpen(true);
-      
-      // Clear the search input so user can easily type a new search
-      setSearchQuery('');
-      
-      if (results.length === 0) {
-        alert(`No documents found matching "${searchQuery}". Try different keywords or check if documents are uploaded.`);
-      }
-    } catch (error) {
-      console.error('Error performing semantic search:', error);
-      alert('Failed to perform semantic search. Please try again.');
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleCloseSearchDialog = () => {
-    setSearchDialogOpen(false);
-    setSearchResults([]);
-  };
-
-  const handleViewDocumentFromSearch = (docId) => {
-    handleCloseSearchDialog();
-    handleViewDocument(docId);
+    setEntitiesDialogOpen(false);    setEntitiesContent([]);
+    setEntitiesDocumentName('');
   };
 
   // NEW: Chatbot functions
@@ -478,107 +385,484 @@ function DocumentLibrary({ refresh }) {
       setChatLoading(false);
     }
   };
+  // Search functionality for integrated search within uploaded documents
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchError('Please enter a search query');
+      return;
+    }
+
+    const currentQuery = searchQuery.trim();
+    setLastSearchQuery(currentQuery); // Save what was searched
+    setSearchLoading(true);
+    setSearchError('');
+    setSearchResults([]);
+
+    try {
+      // Get all document texts and perform semantic search
+      const searchPromises = documents.map(async (doc) => {
+        try {
+          // Get document text (to verify document is accessible)
+          const textResponse = await fetch(`${BACKEND_BASE_URL}/api/documents/${doc.id}/text`);
+          if (!textResponse.ok) {
+            console.warn(`Failed to fetch text for document ${doc.id}`);
+            return null;
+          }
+          
+          // Use the document QA endpoint for semantic search
+          const qaResponse = await fetch(`${BACKEND_BASE_URL}/api/document/${doc.id}/qa/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: currentQuery }),
+          });
+
+          if (!qaResponse.ok) {
+            console.warn(`Failed to search in document ${doc.id}`);
+            return null;
+          }
+
+          const qaResult = await qaResponse.json();
+          
+          // Return result with document context
+          return {
+            document_id: doc.id,
+            filename: doc.filename,
+            subject: doc.subject,
+            upload_date: doc.upload_date,
+            content: qaResult.answer,
+            similarity: 0.8, // Default similarity since QA endpoint doesn't return this
+          };
+        } catch (error) {
+          console.warn(`Error searching document ${doc.id}:`, error);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(searchPromises);
+      const validResults = results.filter(result => result !== null && result.content && result.content.toLowerCase() !== 'i couldn\'t find any highly relevant sections in the document for your question.');
+      
+      setSearchResults(validResults);
+      
+      // Clear search input after successful search
+      setSearchQuery('');
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError('Search failed. Please try again.');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleViewDocumentFromSearch = (documentId) => {
+    const document = documents.find(doc => doc.id === documentId);
+    if (document) {
+      handleViewDocument(documentId);
+    }
+  };
+
   return (
-    <Box sx={{ width: '100%', mx: 'auto', mt: 4 }}>
-      <Paper
+    <Box sx={{ width: '100%', mx: 'auto', mt: 4 }}>      <Paper
         elevation={4}
         sx={{
           p: 4,
-          background: '#f4f6f8',
+          background: 'rgba(244, 246, 248, 0.95)', // Semi-transparent background
+          backdropFilter: 'blur(15px)', // Glass effect
           borderRadius: 4,
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)',
-          border: '1px solid #e0e3e7',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.20)',
+          border: '1px solid rgba(224, 227, 231, 0.5)',
           width: '100%',
           minHeight: 350,
-        }}
-      >        <Typography
+        }}      ><Typography
           variant="h6"
           sx={{
-            fontWeight: 800,
-            mb: 2,
-            color: '#1976d2',
-            fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.5rem' }, // Decreased font size
-            letterSpacing: 1,
+            fontFamily: '"Inter", "Poppins", "Roboto", "Arial", sans-serif',
+            fontWeight: 700,
+            mb: 3,
+            color: 'transparent',
+            background: 'linear-gradient(135deg, #1976d2 0%, #64b5f6 50%, #42a5f5 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            fontSize: { xs: '1.2rem', sm: '1.4rem', md: '1.6rem' },
+            letterSpacing: '0.5px',
+            textShadow: '0 2px 4px rgba(25, 118, 210, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: -8,
+              left: 0,
+              width: '60px',
+              height: '3px',
+              background: 'linear-gradient(90deg, #1976d2, #64b5f6)',
+              borderRadius: '2px',
+              opacity: 0.8,
+            }
           }}
         >
-          <DescriptionIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#388e3c', fontSize: 28 }} />
+          <DescriptionIcon sx={{ 
+            mr: 1.5, 
+            verticalAlign: 'middle', 
+            color: '#388e3c',
+            fontSize: 32,
+            filter: 'drop-shadow(0 2px 4px rgba(56, 142, 60, 0.3))',
+            transition: 'transform 0.2s ease',
+            '&:hover': {
+              transform: 'scale(1.1)',
+            }
+          }} />
           Uploaded Documents
         </Typography>
-        
-        {/* Semantic Search Bar */}
-        <Box sx={{ mb: 3 }}>
-          <Paper sx={{ 
-            p: 2, 
-            background: 'linear-gradient(90deg, #e3f2fd 0%, #f3e5f5 100%)',
-            border: '1px solid #1976d2',
-            borderRadius: 3
+
+        {/* Scroll Indicator */}
+        {documents && documents.length > 3 && (
+          <Box sx={{ 
+            mb: 2, 
+            textAlign: 'center',
+            opacity: 0.7
           }}>
-            <Typography variant="subtitle1" sx={{ 
-              color: '#1976d2', 
-              fontWeight: 600, 
-              mb: 2,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}>
-              <SearchIcon />
-              🔍 Semantic Search - Find information across all documents
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Search for compliance requirements, policies, procedures, or any specific information..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSemanticSearch();
-                  }
-                }}
-                size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    background: '#fff',
-                    borderRadius: 2
-                  }
-                }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleSemanticSearch}
-                disabled={!searchQuery.trim() || searchLoading}
-                startIcon={searchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
-                sx={{ 
-                  minWidth: '120px',
-                  borderRadius: 2,
-                  background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)'
-                }}
-              >
-                {searchLoading ? 'Searching...' : 'Search'}
-              </Button>
-            </Box>            <Typography variant="caption" sx={{ 
+            <Typography variant="caption" sx={{ 
               color: '#666', 
-              mt: 1, 
-              display: 'block',
-              fontStyle: 'italic'
+              fontSize: '0.75rem',
+              background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)',
+              px: 2,
+              py: 0.5,
+              borderRadius: 2,
+              border: '1px solid #bbdefb'
             }}>
-              💡 Try: "compliance requirements", "data protection policies", "employee guidelines", "safety procedures", "training materials", etc.
+              📋 Documents section is scrollable when you have many subjects
             </Typography>
-          </Paper>
-        </Box>
+          </Box>
+        )}
+
+        {/* Integrated Search Bar */}
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="🔍 Search across all documents... (e.g., 'data privacy requirements', 'security policies', 'compliance standards')"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">                  <Button
+                    variant="contained"
+                    onClick={handleSearch}
+                    disabled={searchLoading || !searchQuery.trim()}
+                    sx={{
+                      background: searchLoading 
+                        ? 'linear-gradient(45deg, #4fc3f7 0%, #81c784 50%, #4fc3f7 100%)' 
+                        : 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
+                      backgroundSize: searchLoading ? '200% 100%' : '100% 100%',
+                      animation: searchLoading ? 'gradientShift 2s ease-in-out infinite' : 'none',
+                      minWidth: searchLoading ? 140 : 'auto',
+                      px: searchLoading ? 2 : 2,
+                      py: 1,
+                      transition: 'all 0.3s ease',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      '&:hover': {
+                        background: searchLoading 
+                          ? 'linear-gradient(45deg, #4fc3f7 0%, #81c784 50%, #4fc3f7 100%)' 
+                          : 'linear-gradient(90deg, #1565c0 0%, #1976d2 100%)',
+                        transform: searchLoading ? 'none' : 'scale(1.05)',
+                      },
+                      '&:disabled': {
+                        background: 'linear-gradient(90deg, #e0e0e0 0%, #f0f0f0 100%)',
+                        color: '#999',
+                      },
+                      '@keyframes gradientShift': {
+                        '0%': { backgroundPosition: '0% 50%' },
+                        '50%': { backgroundPosition: '100% 50%' },
+                        '100%': { backgroundPosition: '0% 50%' }
+                      }
+                    }}
+                  >
+                    {searchLoading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <CircularProgress 
+                          size={20} 
+                          thickness={3}
+                          color="inherit" 
+                          sx={{
+                            animation: 'pulse 1.5s ease-in-out infinite',
+                            '@keyframes pulse': {
+                              '0%': { opacity: 0.6, transform: 'scale(0.8)' },
+                              '50%': { opacity: 1, transform: 'scale(1)' },
+                              '100%': { opacity: 0.6, transform: 'scale(0.8)' }
+                            }
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ 
+                          fontWeight: 700, 
+                          fontSize: '0.8rem',
+                          letterSpacing: '0.5px',
+                          animation: 'fadeInOut 2s ease-in-out infinite',
+                          '@keyframes fadeInOut': {
+                            '0%': { opacity: 0.7 },
+                            '50%': { opacity: 1 },
+                            '100%': { opacity: 0.7 }
+                          }
+                        }}>
+                          Searching...
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <SearchIcon sx={{ 
+                        fontSize: 22,
+                        transition: 'all 0.2s ease',
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                      }} />
+                    )}
+                  </Button>
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                background: '#fff',
+              },
+            }}
+          />
+          {searchError && (
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+              {searchError}
+            </Typography>
+          )}
+        </Box>        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            {/* Search summary moved to top */}
+            {lastSearchQuery && (
+              <Box sx={{ 
+                mb: 3, 
+                p: 3, 
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)', 
+                borderRadius: 3, 
+                border: '1px solid #bbdefb',
+                textAlign: 'center',
+                boxShadow: '0 2px 8px rgba(25, 118, 210, 0.15)'
+              }}>
+                <Typography variant="h6" sx={{ 
+                  color: '#1976d2', 
+                  fontWeight: 700,
+                  mb: 1,
+                  fontSize: '1.1rem'
+                }}>
+                  🔍 Search Results
+                </Typography>
+                <Typography variant="body1" sx={{ 
+                  color: '#424242', 
+                  mb: 1,
+                  fontSize: '1rem'
+                }}>
+                  You searched for: <strong>"{lastSearchQuery}"</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ 
+                  color: '#666', 
+                  fontSize: '0.9rem'
+                }}>
+                  Found {searchResults.length} relevant {searchResults.length === 1 ? 'result' : 'results'} across your documents
+                </Typography>
+              </Box>
+            )}
+            <Stack spacing={2}>
+              {searchResults.map((result, index) => {
+                const document = documents.find(doc => doc.id === result.document_id);
+                return (
+                  <Paper 
+                    key={index}
+                    sx={{ 
+                      p: 3,
+                      background: '#fff',
+                      borderRadius: 2,
+                      border: '1px solid #e0e0e0',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
+                  >
+                    {/* Document Header */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'flex-start',
+                      mb: 2
+                    }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            color: '#1976d2', 
+                            fontWeight: 600,
+                            mb: 1,
+                            fontSize: '1.1rem'
+                          }}
+                        >
+                          📄 {document?.filename || `Document ${result.document_id}`}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                          <Chip 
+                            label={document?.subject || 'Uncategorized'}
+                            size="small"
+                            sx={{ 
+                              background: '#e3f2fd',
+                              color: '#1976d2',
+                              fontWeight: 600
+                            }}
+                          />
+                          <Chip 
+                            label={`Relevance: ${Math.round((result.similarity || 0) * 100)}%`}
+                            size="small"
+                            sx={{ 
+                              background: result.similarity > 0.7 ? '#e8f5e9' : '#fff3e0',
+                              color: result.similarity > 0.7 ? '#2e7d32' : '#f57c00',
+                              fontWeight: 600
+                            }}
+                          />
+                        </Box>
+                      </Box>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => handleViewDocumentFromSearch(result.document_id)}
+                        sx={{ ml: 2 }}
+                      >
+                        View Document
+                      </Button>
+                    </Box>
+
+                    {/* Relevant Content Preview */}
+                    <Box sx={{ 
+                      background: '#f8f9fa',
+                      borderRadius: 2,
+                      p: 2,
+                      border: '1px solid #e9ecef'
+                    }}>
+                      <Typography variant="subtitle2" sx={{ 
+                        color: '#1976d2', 
+                        fontWeight: 600, 
+                        mb: 1,
+                        fontSize: '0.9rem'
+                      }}>
+                        🎯 Relevant Content:
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          lineHeight: 1.6,
+                          color: '#333',
+                          fontFamily: '"Segoe UI", "Roboto", "Arial", sans-serif',
+                          whiteSpace: 'pre-wrap'
+                        }}
+                      >
+                        {result.content || 'Content preview not available'}
+                      </Typography>
+                    </Box>
+
+                    {/* Document Info */}
+                    <Box sx={{ 
+                      mt: 2, 
+                      pt: 2, 
+                      borderTop: '1px solid #e0e0e0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <Typography variant="caption" color="text.secondary">
+                        📅 Uploaded: {document ? formatDateTime(document.upload_date) : 'Unknown'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        🆔 Document ID: {result.document_id}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                );              })}            </Stack>
+            
+            <Divider sx={{ my: 3 }} />
+          </Box>
+        )}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress size={40} />
-          </Box>
-        ) : (          <>
+          </Box>        ) : (          <>
             {!documents || documents.length === 0 ? (
               <Typography variant="h6" color="text.secondary" align="center" sx={{ my: 2, fontWeight: 400 }}>
                 No documents uploaded yet.
               </Typography>
-            ) : (
-              (() => {
+            ) : (              <Box 
+                sx={{ 
+                  maxHeight: '70vh', // Set maximum height
+                  overflowY: 'auto', // Enable vertical scrolling
+                  overflowX: 'hidden', // Hide horizontal scrolling
+                  pr: 1, // Add padding for scrollbar
+                  pl: 0.5, // Small left padding
+                  py: 1, // Vertical padding
+                  position: 'relative',
+                  borderRadius: 2,
+                  border: '2px solid transparent',
+                  background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%) border-box',
+                  // Custom scrollbar styling for WebKit browsers (Chrome, Safari, Edge)
+                  '&::-webkit-scrollbar': {
+                    width: '12px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: '#f8f9fa',
+                    borderRadius: '10px',
+                    border: '1px solid #e9ecef',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                    borderRadius: '10px',
+                    border: '2px solid #f8f9fa',
+                    boxShadow: '0 2px 4px rgba(25, 118, 210, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                      transform: 'scale(1.05)',
+                    },
+                    '&:active': {
+                      background: 'linear-gradient(135deg, #0d47a1 0%, #1565c0 100%)',
+                    }
+                  },
+                  // Firefox scrollbar styling
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#1976d2 #f8f9fa',
+                  // Add scroll indicators with shadows
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 12, // Account for scrollbar
+                    height: '15px',
+                    background: 'linear-gradient(to bottom, rgba(227, 242, 253, 0.8), transparent)',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                    borderRadius: '8px 8px 0 0',
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 12, // Account for scrollbar
+                    height: '15px',
+                    background: 'linear-gradient(to top, rgba(227, 242, 253, 0.8), transparent)',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                    borderRadius: '0 0 8px 8px',
+                  }
+                }}
+              >
+                {(() => {
                 const groupedDocuments = groupDocumentsBySubject(documents);
                 const subjects = Object.keys(groupedDocuments).sort();
                 
@@ -877,9 +1161,9 @@ function DocumentLibrary({ refresh }) {
                         </List>
                       </AccordionDetails>
                     </Accordion>
-                  );
-                }).filter(Boolean); // Filter out any null results
-              })()
+                  );                }).filter(Boolean); // Filter out any null results
+                })()}
+              </Box>
             )}
           </>
         )}
@@ -1338,210 +1622,205 @@ function DocumentLibrary({ refresh }) {
               background: 'linear-gradient(90deg, #ff9800 0%, #ffc107 100%)'
             }}
           >
-            📋 Copy Entities
-          </Button>        </DialogActions>
+            📋 Copy Entities          </Button>        </DialogActions>
       </Dialog>
 
-      {/* Semantic Search Results Dialog */}
-      <Dialog 
-        open={searchDialogOpen} 
-        onClose={handleCloseSearchDialog}
-        maxWidth="lg"
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={handleCancelDelete}
+        maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            height: '80vh',
-            maxHeight: '700px',
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 3,
+            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
           }
         }}
       >
         <DialogTitle sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+          background: 'linear-gradient(135deg, #f44336 0%, #e57373 100%)',
+          color: 'white',
+          display: 'flex',
           alignItems: 'center',
-          background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
-          color: 'white'
+          gap: 2,
+          py: 3
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <SearchIcon sx={{ mr: 1 }} />
-            <Typography variant="h6">🔍 Search Results</Typography>
+          <WarningIcon sx={{ fontSize: 32, color: '#ffeb3b' }} />
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Confirm Document Deletion
+            </Typography>
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+              This action cannot be undone
+            </Typography>
           </Box>
-          <IconButton onClick={handleCloseSearchDialog} sx={{ color: 'white' }}>
-            <CloseIcon />
-          </IconButton>
         </DialogTitle>
         
-        <DialogContent sx={{ p: 0 }}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="subtitle1" sx={{ 
-              color: '#1976d2', 
-              fontWeight: 600, 
-              mb: 3,
-              fontSize: '1.1rem'
-            }}>
-              📝 Query: "{searchQuery}"
-            </Typography>
-            
-            {searchResults.length === 0 ? (
-              <Paper sx={{ 
-                p: 4,
-                background: '#f5f5f5',
-                borderRadius: 2,
-                textAlign: 'center'
+        <DialogContent sx={{ p: 3 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'flex-start',
+            gap: 2,
+            mb: 3
+          }}>
+            <ErrorOutlineIcon sx={{ 
+              color: '#f44336', 
+              fontSize: 28,
+              mt: 0.5
+            }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body1" sx={{ 
+                fontWeight: 600, 
+                mb: 2,
+                color: '#333'
               }}>
-                <Typography variant="h6" color="text.secondary">
-                  No relevant information found
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Try refining your search with different keywords or phrases.
-                </Typography>
-              </Paper>
-            ) : (
-              <Stack spacing={2}>
-                {searchResults.map((result, index) => {
-                  const document = documents.find(doc => doc.id === result.document_id);
-                  return (
-                    <Paper 
-                      key={index}
-                      sx={{ 
-                        p: 3,
-                        background: '#fff',
-                        borderRadius: 2,
-                        border: '1px solid #e0e0e0',
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                    >
-                      {/* Document Header */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'flex-start',
-                        mb: 2
-                      }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography 
-                            variant="h6" 
-                            sx={{ 
-                              color: '#1976d2', 
-                              fontWeight: 600,
-                              mb: 1,
-                              fontSize: '1.1rem'
-                            }}
-                          >
-                            📄 {document?.filename || `Document ${result.document_id}`}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                            <Chip 
-                              label={document?.subject || 'Uncategorized'}
-                              size="small"
-                              sx={{ 
-                                background: '#e3f2fd',
-                                color: '#1976d2',
-                                fontWeight: 600
-                              }}
-                            />
-                            <Chip 
-                              label={`Relevance: ${Math.round((result.similarity || 0) * 100)}%`}
-                              size="small"
-                              sx={{ 
-                                background: result.similarity > 0.7 ? '#e8f5e9' : result.similarity > 0.5 ? '#fff3e0' : '#ffebee',
-                                color: result.similarity > 0.7 ? '#2e7d32' : result.similarity > 0.5 ? '#f57c00' : '#d32f2f',
-                                fontWeight: 600
-                              }}
-                            />
-                          </Box>
-                        </Box>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<VisibilityIcon />}
-                          onClick={() => handleViewDocumentFromSearch(result.document_id)}
-                          sx={{ ml: 2 }}
-                        >
-                          View Document
-                        </Button>
-                      </Box>
-
-                      {/* Relevant Content Preview */}
-                      <Box sx={{ 
-                        background: '#f8f9fa',
-                        borderRadius: 2,
-                        p: 2,
-                        border: '1px solid #e9ecef'
-                      }}>
-                        <Typography variant="subtitle2" sx={{ 
-                          color: '#1976d2', 
-                          fontWeight: 600, 
-                          mb: 1,
-                          fontSize: '0.9rem'
-                        }}>
-                          🎯 Relevant Content:
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            lineHeight: 1.6,
-                            color: '#333',
-                            fontFamily: '"Segoe UI", "Roboto", "Arial", sans-serif',
-                            whiteSpace: 'pre-wrap'
-                          }}
-                        >
-                          {result.content || result.text || 'Content preview not available'}
-                        </Typography>
-                      </Box>
-
-                      {/* Document Info */}
-                      <Box sx={{ 
-                        mt: 2, 
-                        pt: 2, 
-                        borderTop: '1px solid #e0e0e0',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}>
-                        <Typography variant="caption" color="text.secondary">
-                          📅 Uploaded: {document ? formatDateTime(document.upload_date) : 'Unknown'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          🆔 Document ID: {result.document_id}
-                        </Typography>
-                      </Box>
-                    </Paper>
-                  );
-                })}
-              </Stack>
-            )}
+                Are you sure you want to permanently delete this document?
+              </Typography>
+              
+              {documentToDelete && (
+                <Paper sx={{ 
+                  p: 2, 
+                  background: '#f8f9fa',
+                  border: '2px solid #ffeaa7',
+                  borderRadius: 2
+                }}>
+                  <Typography variant="subtitle2" sx={{ 
+                    color: '#d63031', 
+                    fontWeight: 700,
+                    mb: 1
+                  }}>
+                    📄 Document to be deleted:
+                  </Typography>
+                  <Typography variant="body2" sx={{ 
+                    fontWeight: 600,
+                    color: '#2d3436',
+                    mb: 1
+                  }}>
+                    <strong>Name:</strong> {documentToDelete.filename}
+                  </Typography>
+                  <Typography variant="body2" sx={{ 
+                    color: '#636e72',
+                    mb: 1
+                  }}>
+                    <strong>Subject:</strong> {documentToDelete.subject || 'Uncategorized'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ 
+                    color: '#636e72'
+                  }}>
+                    <strong>Uploaded:</strong> {formatDateTime(documentToDelete.upload_date)}
+                  </Typography>
+                </Paper>
+              )}
+            </Box>
+          </Box>
+          
+          <Box sx={{ 
+            background: 'linear-gradient(135deg, #ffe0e0 0%, #ffecec 100%)',
+            border: '1px solid #ffcdd2',
+            borderRadius: 2,
+            p: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <WarningIcon sx={{ color: '#f44336', fontSize: 20 }} />
+            <Typography variant="caption" sx={{ 
+              color: '#d32f2f',
+              fontWeight: 600,
+              fontSize: '0.85rem'
+            }}>
+              This will permanently remove the document from the database and delete the file from storage.
+            </Typography>
           </Box>
         </DialogContent>
         
-        <DialogActions sx={{ p: 2, background: '#f5f5f5' }}>
-          <Button onClick={handleCloseSearchDialog} variant="outlined">
-            Close
-          </Button>
+        <DialogActions sx={{ 
+          p: 3, 
+          background: '#fafafa',
+          gap: 2,
+          justifyContent: 'flex-end'
+        }}>
           <Button 
-            variant="contained" 
-            onClick={() => {
-              const resultsText = searchResults.length === 0 
-                ? `No results found for: "${searchQuery}"`
-                : `Search Results for: "${searchQuery}"\n\n${searchResults.map((result, index) => {
-                    const doc = documents.find(d => d.id === result.document_id);
-                    return `${index + 1}. ${doc?.filename || `Document ${result.document_id}`} (${doc?.subject || 'Uncategorized'})\nRelevance: ${Math.round((result.similarity || 0) * 100)}%\nContent: ${result.content || result.text || 'No preview'}\n`;
-                  }).join('\n')}`;
-              navigator.clipboard.writeText(resultsText);
-              alert('Search results copied to clipboard!');
-            }}            disabled={searchResults.length === 0}
+            onClick={handleCancelDelete}
+            variant="outlined"
+            disabled={deleteLoading}
             sx={{
-              background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)'
+              px: 3,
+              py: 1,
+              borderColor: '#9e9e9e',
+              color: '#424242',
+              '&:hover': {
+                borderColor: '#757575',
+                background: '#f5f5f5'
+              }
             }}
           >
-            📋 Copy Results
+            Cancel
           </Button>
+          <Button 
+            onClick={handleConfirmDelete}
+            variant="contained"
+            disabled={deleteLoading}
+            sx={{
+              px: 4,
+              py: 1,
+              background: deleteLoading 
+                ? 'linear-gradient(90deg, #ef5350 0%, #e57373 100%)' 
+                : 'linear-gradient(90deg, #f44336 0%, #e53935 100%)',
+              color: 'white',
+              fontWeight: 700,
+              '&:hover': {
+                background: 'linear-gradient(90deg, #d32f2f 0%, #c62828 100%)',
+                transform: deleteLoading ? 'none' : 'scale(1.02)'
+              },
+              '&:disabled': {
+                background: 'linear-gradient(90deg, #ffcdd2 0%, #ef9a9a 100%)',
+                color: '#999'
+              }
+            }}
+          >
+            {deleteLoading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={18} color="inherit" />
+                <Typography variant="button" sx={{ fontSize: '0.85rem' }}>
+                  Deleting...
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <DeleteIcon sx={{ fontSize: 18 }} />
+                <Typography variant="button" sx={{ fontSize: '0.85rem' }}>
+                  Delete Permanently
+                </Typography>
+              </Box>
+            )}          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success/Error Notification */}
+      <Snackbar
+        open={notificationOpen}
+        autoHideDuration={4000}
+        onClose={() => setNotificationOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setNotificationOpen(false)}
+          severity={notificationSeverity}
+          variant="filled"
+          sx={{
+            width: '100%',
+            borderRadius: 2,
+            fontWeight: 600,
+            '& .MuiAlert-icon': {
+              fontSize: '1.5rem'
+            }
+          }}
+        >
+          {notificationMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
