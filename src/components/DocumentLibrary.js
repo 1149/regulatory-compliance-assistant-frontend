@@ -35,6 +35,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import SendIcon from '@mui/icons-material/Send';
 import CloseIcon from '@mui/icons-material/Close';
 import FolderIcon from '@mui/icons-material/Folder';
+import SearchIcon from '@mui/icons-material/Search';
 
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
 
@@ -73,11 +74,15 @@ function DocumentLibrary({ refresh }) {
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [summaryContent, setSummaryContent] = useState('');
   const [summaryType, setSummaryType] = useState(''); // 'cloud' or 'local'
-  const [summaryDocumentName, setSummaryDocumentName] = useState('');
-  // Entities dialog states
+  const [summaryDocumentName, setSummaryDocumentName] = useState('');  // Entities dialog states
   const [entitiesDialogOpen, setEntitiesDialogOpen] = useState(false);
   const [entitiesContent, setEntitiesContent] = useState([]);
-  const [entitiesDocumentName, setEntitiesDocumentName] = useState('');  // Helper function to group documents by subject
+  const [entitiesDocumentName, setEntitiesDocumentName] = useState('');
+  // Semantic search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);// Helper function to group documents by subject
   const groupDocumentsBySubject = (documents) => {
     const grouped = {};
     // Add safety check for documents array and filter out null/undefined items
@@ -264,11 +269,146 @@ function DocumentLibrary({ refresh }) {
     setSummaryType('');
     setSummaryDocumentName('');
   };
-
   const handleCloseEntitiesDialog = () => {
     setEntitiesDialogOpen(false);
-    setEntitiesContent([]);
-    setEntitiesDocumentName('');
+    setEntitiesContent([]);    setEntitiesDocumentName('');
+  };
+
+  // Semantic search functions
+  const handleSemanticSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setSearchLoading(true);
+    setSearchResults([]);
+    
+    try {
+      const query = searchQuery.toLowerCase();
+      const results = [];
+      
+      for (const doc of documents) {
+        if (!doc || !doc.id) continue;
+        
+        let relevanceScore = 0;
+        let matchedContent = '';
+        let contentPreview = '';
+        let matchContext = '';
+        
+        // Check filename match (higher weight)
+        if (doc.filename && doc.filename.toLowerCase().includes(query)) {
+          relevanceScore += 0.9;
+          matchedContent += `📄 Filename: "${doc.filename}"\n`;
+        }
+        
+        // Check subject match (high weight)
+        if (doc.subject && doc.subject.toLowerCase().includes(query)) {
+          relevanceScore += 0.85;
+          matchedContent += `🏷️ Subject: "${doc.subject}"\n`;        }
+        
+        // Try to get document content and search within it
+        try {
+          const textResponse = await fetch(`${BACKEND_BASE_URL}/api/documents/${doc.id}/text`);
+          if (textResponse.ok) {
+            const documentText = await textResponse.text();
+            const lowerText = documentText.toLowerCase();
+            
+            // Direct query match in content (highest weight)
+            if (lowerText.includes(query)) {
+              relevanceScore += 1.0;
+              
+              // Extract relevant snippet with context
+              const queryIndex = lowerText.indexOf(query);
+              const contextStart = Math.max(0, queryIndex - 150);
+              const contextEnd = Math.min(documentText.length, queryIndex + query.length + 150);
+              const snippet = documentText.substring(contextStart, contextEnd).trim();
+              
+              // Highlight the matched term
+              const originalSnippet = documentText.substring(contextStart, contextEnd);
+              const highlightedSnippet = originalSnippet.replace(
+                new RegExp(query, 'gi'), 
+                `**${query.toUpperCase()}**`
+              );
+              
+              matchedContent += `📝 Content match found\n`;
+              contentPreview = `...${highlightedSnippet}...`;
+              matchContext = snippet;
+            }
+            
+            // Search for individual keywords if no direct match
+            if (relevanceScore < 1.0) {
+              const keywords = query.split(' ').filter(word => word.length > 2);
+              let keywordMatches = 0;
+              
+              for (const keyword of keywords) {
+                if (lowerText.includes(keyword.toLowerCase())) {
+                  keywordMatches++;
+                  relevanceScore += 0.3;
+                  
+                  // Get context for first keyword if no previous context
+                  if (!matchContext) {
+                    const keywordIndex = lowerText.indexOf(keyword.toLowerCase());
+                    const contextStart = Math.max(0, keywordIndex - 100);
+                    const contextEnd = Math.min(documentText.length, keywordIndex + keyword.length + 100);
+                    matchContext = documentText.substring(contextStart, contextEnd).trim();
+                    contentPreview = `...${matchContext}...`;
+                  }
+                }
+              }
+              
+              if (keywordMatches > 0) {
+                matchedContent += `🔍 ${keywordMatches} keyword${keywordMatches > 1 ? 's' : ''} found\n`;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`Could not fetch content for document ${doc.id}:`, error);
+        }
+        
+        // If we have any matches, add to results
+        if (relevanceScore > 0) {
+          // Create default preview if no content preview
+          if (!contentPreview) {
+            contentPreview = `Document: ${doc.filename} | Subject: ${doc.subject || 'Uncategorized'} | Uploaded: ${formatDateTime(doc.upload_date)}`;
+          }
+          
+          results.push({
+            document_id: doc.id,
+            document: doc, // Include full document object
+            similarity: Math.min(relevanceScore, 1.0),
+            content: matchedContent || `Document contains information related to "${searchQuery}"`,
+            text: contentPreview,
+            context: matchContext,
+            preview: contentPreview
+          });
+        }
+      }
+        // Sort by relevance score (highest first)
+      results.sort((a, b) => b.similarity - a.similarity);
+      
+      setSearchResults(results);
+      setSearchDialogOpen(true);
+      
+      // Clear the search input so user can easily type a new search
+      setSearchQuery('');
+      
+      if (results.length === 0) {
+        alert(`No documents found matching "${searchQuery}". Try different keywords or check if documents are uploaded.`);
+      }
+    } catch (error) {
+      console.error('Error performing semantic search:', error);
+      alert('Failed to perform semantic search. Please try again.');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleCloseSearchDialog = () => {
+    setSearchDialogOpen(false);
+    setSearchResults([]);
+  };
+
+  const handleViewDocumentFromSearch = (docId) => {
+    handleCloseSearchDialog();
+    handleViewDocument(docId);
   };
 
   // NEW: Chatbot functions
@@ -351,8 +491,7 @@ function DocumentLibrary({ refresh }) {
           width: '100%',
           minHeight: 350,
         }}
-      >
-        <Typography
+      >        <Typography
           variant="h6"
           sx={{
             fontWeight: 800,
@@ -365,6 +504,70 @@ function DocumentLibrary({ refresh }) {
           <DescriptionIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#388e3c', fontSize: 28 }} />
           Uploaded Documents
         </Typography>
+        
+        {/* Semantic Search Bar */}
+        <Box sx={{ mb: 3 }}>
+          <Paper sx={{ 
+            p: 2, 
+            background: 'linear-gradient(90deg, #e3f2fd 0%, #f3e5f5 100%)',
+            border: '1px solid #1976d2',
+            borderRadius: 3
+          }}>
+            <Typography variant="subtitle1" sx={{ 
+              color: '#1976d2', 
+              fontWeight: 600, 
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <SearchIcon />
+              🔍 Semantic Search - Find information across all documents
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Search for compliance requirements, policies, procedures, or any specific information..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSemanticSearch();
+                  }
+                }}
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    background: '#fff',
+                    borderRadius: 2
+                  }
+                }}
+              />
+              <Button
+                variant="contained"
+                onClick={handleSemanticSearch}
+                disabled={!searchQuery.trim() || searchLoading}
+                startIcon={searchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
+                sx={{ 
+                  minWidth: '120px',
+                  borderRadius: 2,
+                  background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)'
+                }}
+              >
+                {searchLoading ? 'Searching...' : 'Search'}
+              </Button>
+            </Box>            <Typography variant="caption" sx={{ 
+              color: '#666', 
+              mt: 1, 
+              display: 'block',
+              fontStyle: 'italic'
+            }}>
+              💡 Try: "compliance requirements", "data protection policies", "employee guidelines", "safety procedures", "training materials", etc.
+            </Typography>
+          </Paper>
+        </Box>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress size={40} />
@@ -535,14 +738,12 @@ function DocumentLibrary({ refresh }) {
                                 />
                               </ListItem>
                               <Collapse in={expandedId === doc.id} timeout="auto" unmountOnExit>
-                                <Box
-                                  sx={{
+                                <Box                                  sx={{
                                     px: 3,
                                     py: 3,
                                     background: '#e3f2fd',
                                     borderRadius: 0,
                                     mb: 0,
-                                    animation: 'fadeIn 0.3s',
                                     width: '100%',
                                   }}
                                 >
@@ -1138,18 +1339,209 @@ function DocumentLibrary({ refresh }) {
             }}
           >
             📋 Copy Entities
+          </Button>        </DialogActions>
+      </Dialog>
+
+      {/* Semantic Search Results Dialog */}
+      <Dialog 
+        open={searchDialogOpen} 
+        onClose={handleCloseSearchDialog}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            height: '80vh',
+            maxHeight: '700px',
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
+          color: 'white'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <SearchIcon sx={{ mr: 1 }} />
+            <Typography variant="h6">🔍 Search Results</Typography>
+          </Box>
+          <IconButton onClick={handleCloseSearchDialog} sx={{ color: 'white' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ p: 3 }}>
+            <Typography variant="subtitle1" sx={{ 
+              color: '#1976d2', 
+              fontWeight: 600, 
+              mb: 3,
+              fontSize: '1.1rem'
+            }}>
+              📝 Query: "{searchQuery}"
+            </Typography>
+            
+            {searchResults.length === 0 ? (
+              <Paper sx={{ 
+                p: 4,
+                background: '#f5f5f5',
+                borderRadius: 2,
+                textAlign: 'center'
+              }}>
+                <Typography variant="h6" color="text.secondary">
+                  No relevant information found
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Try refining your search with different keywords or phrases.
+                </Typography>
+              </Paper>
+            ) : (
+              <Stack spacing={2}>
+                {searchResults.map((result, index) => {
+                  const document = documents.find(doc => doc.id === result.document_id);
+                  return (
+                    <Paper 
+                      key={index}
+                      sx={{ 
+                        p: 3,
+                        background: '#fff',
+                        borderRadius: 2,
+                        border: '1px solid #e0e0e0',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      {/* Document Header */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'flex-start',
+                        mb: 2
+                      }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography 
+                            variant="h6" 
+                            sx={{ 
+                              color: '#1976d2', 
+                              fontWeight: 600,
+                              mb: 1,
+                              fontSize: '1.1rem'
+                            }}
+                          >
+                            📄 {document?.filename || `Document ${result.document_id}`}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                            <Chip 
+                              label={document?.subject || 'Uncategorized'}
+                              size="small"
+                              sx={{ 
+                                background: '#e3f2fd',
+                                color: '#1976d2',
+                                fontWeight: 600
+                              }}
+                            />
+                            <Chip 
+                              label={`Relevance: ${Math.round((result.similarity || 0) * 100)}%`}
+                              size="small"
+                              sx={{ 
+                                background: result.similarity > 0.7 ? '#e8f5e9' : result.similarity > 0.5 ? '#fff3e0' : '#ffebee',
+                                color: result.similarity > 0.7 ? '#2e7d32' : result.similarity > 0.5 ? '#f57c00' : '#d32f2f',
+                                fontWeight: 600
+                              }}
+                            />
+                          </Box>
+                        </Box>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<VisibilityIcon />}
+                          onClick={() => handleViewDocumentFromSearch(result.document_id)}
+                          sx={{ ml: 2 }}
+                        >
+                          View Document
+                        </Button>
+                      </Box>
+
+                      {/* Relevant Content Preview */}
+                      <Box sx={{ 
+                        background: '#f8f9fa',
+                        borderRadius: 2,
+                        p: 2,
+                        border: '1px solid #e9ecef'
+                      }}>
+                        <Typography variant="subtitle2" sx={{ 
+                          color: '#1976d2', 
+                          fontWeight: 600, 
+                          mb: 1,
+                          fontSize: '0.9rem'
+                        }}>
+                          🎯 Relevant Content:
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            lineHeight: 1.6,
+                            color: '#333',
+                            fontFamily: '"Segoe UI", "Roboto", "Arial", sans-serif',
+                            whiteSpace: 'pre-wrap'
+                          }}
+                        >
+                          {result.content || result.text || 'Content preview not available'}
+                        </Typography>
+                      </Box>
+
+                      {/* Document Info */}
+                      <Box sx={{ 
+                        mt: 2, 
+                        pt: 2, 
+                        borderTop: '1px solid #e0e0e0',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <Typography variant="caption" color="text.secondary">
+                          📅 Uploaded: {document ? formatDateTime(document.upload_date) : 'Unknown'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          🆔 Document ID: {result.document_id}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 2, background: '#f5f5f5' }}>
+          <Button onClick={handleCloseSearchDialog} variant="outlined">
+            Close
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              const resultsText = searchResults.length === 0 
+                ? `No results found for: "${searchQuery}"`
+                : `Search Results for: "${searchQuery}"\n\n${searchResults.map((result, index) => {
+                    const doc = documents.find(d => d.id === result.document_id);
+                    return `${index + 1}. ${doc?.filename || `Document ${result.document_id}`} (${doc?.subject || 'Uncategorized'})\nRelevance: ${Math.round((result.similarity || 0) * 100)}%\nContent: ${result.content || result.text || 'No preview'}\n`;
+                  }).join('\n')}`;
+              navigator.clipboard.writeText(resultsText);
+              alert('Search results copied to clipboard!');
+            }}            disabled={searchResults.length === 0}
+            sx={{
+              background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)'
+            }}
+          >
+            📋 Copy Results
           </Button>
         </DialogActions>
       </Dialog>
-
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px);}
-            to { opacity: 1; transform: translateY(0);}
-          }
-        `}
-      </style>
     </Box>
   );
 }
