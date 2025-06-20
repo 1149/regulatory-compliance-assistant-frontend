@@ -6,6 +6,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
+import UploadSuccessDialog from './dialogs/UploadSuccessDialog';
 
 const BACKEND_BASE_URL = 'http://localhost:8000';
 
@@ -14,6 +15,15 @@ function FileUpload({ onUploadSuccess }) {
   const [subject, setSubject] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Success dialog state
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [uploadDetails, setUploadDetails] = useState({
+    fileName: '',
+    subject: '',
+    fileSize: 0,
+    uploadTime: null
+  });
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -46,17 +56,26 @@ function FileUpload({ onUploadSuccess }) {
     setUploadStatus('Uploading...');
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('subject', subject);
-
-    try {
+    formData.append('subject', subject);    try {
       const response = await fetch(`${BACKEND_BASE_URL}/api/upload-document/`, {
         method: 'POST',
         body: formData,
       });
       if (response.ok) {
-        setUploadStatus('Upload successful!');
+        // Store upload details for success dialog
+        setUploadDetails({
+          fileName: selectedFile.name,
+          subject: subject,
+          fileSize: selectedFile.size,
+          uploadTime: new Date().toISOString()
+        });
+        
+        // Show success dialog instead of status message
+        setShowSuccessDialog(true);
+        setUploadStatus('');
         setSelectedFile(null);
         setSubject('');
+        
         if (onUploadSuccess) onUploadSuccess();
       } else {
         setUploadStatus('Upload failed.');
@@ -66,6 +85,16 @@ function FileUpload({ onUploadSuccess }) {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleCloseSuccessDialog = () => {
+    setShowSuccessDialog(false);
+    setUploadDetails({
+      fileName: '',
+      subject: '',
+      fileSize: 0,
+      uploadTime: null
+    });
   };
 
   return (
@@ -134,8 +163,7 @@ function FileUpload({ onUploadSuccess }) {
         <Typography variant="caption" color="text.secondary">
           Only PDF, Word (.doc, .docx), or TXT files are accepted
         </Typography>
-      </Box>
-      {uploadStatus && (
+      </Box>      {uploadStatus && (
         <Typography
           variant="body2"
           sx={{ mt: 2, color: uploadStatus.includes('successful') ? 'success.main' : 'error.main' }}
@@ -143,6 +171,16 @@ function FileUpload({ onUploadSuccess }) {
           {uploadStatus}
         </Typography>
       )}
+      
+      {/* Success Dialog */}
+      <UploadSuccessDialog
+        open={showSuccessDialog}
+        onClose={handleCloseSuccessDialog}
+        fileName={uploadDetails.fileName}
+        subject={uploadDetails.subject}
+        fileSize={uploadDetails.fileSize}
+        uploadTime={uploadDetails.uploadTime}
+      />
     </Box>
   );
 }

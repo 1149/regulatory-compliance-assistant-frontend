@@ -1,18 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-// MUI components for theme setup
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
-//  Custom MUI theme defined here
 const customTheme = createTheme({
   palette: {
     primary: {
-      main: '#3f51b5', // A shade of indigo
+      main: '#3f51b5',
     },
     secondary: {
-      main: '#f50057', // A shade of pink
+      main: '#f50057',
     },
   },
   typography: {
@@ -34,32 +32,32 @@ const customTheme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'none', // Prevents uppercase transformation
-          padding: '8px 16px', // Custom padding
+          textTransform: 'none',
+          padding: '8px 16px',
         },
       },
     },
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: '#3f51b5', // Matches primary color
+          backgroundColor: '#3f51b5',
         },
       },
     },
   },
   shape: {
-    borderRadius: 8, // Custom border radius for components
+    borderRadius: 8,
   },
-  spacing: 8, // Custom spacing unit
-  direction: 'ltr', // Sets the text direction to left-to-right
+  spacing: 8,
+  direction: 'ltr',
   mixins: {
     toolbar: {
-      minHeight: 64, // Custom height for the toolbar
+      minHeight: 64,
     },
   },
   zIndex: {
-    appBar: 1200, // Custom z-index for AppBar
-    drawer: 1100, // Custom z-index for Drawer
+    appBar: 1200,
+    drawer: 1100,
   },
   shadows: ['none', '0px 2px 4px rgba(0, 0, 0, 0.1)', '0px 3px 5px rgba(0, 0, 0, 0.15)'], // Custom shadows
   breakpoints: {

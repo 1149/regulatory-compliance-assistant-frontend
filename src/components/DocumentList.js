@@ -1,3 +1,13 @@
+/**
+ * DocumentList Component
+ * 
+ * Alternative table-based view for document management that provides:
+ * - Tabular display of all documents with key metadata
+ * - Document summarization and entity extraction
+ * - Integrated document viewer with entity highlighting
+ * - Chat functionality for document-specific queries
+ */
+
 import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Table, TableBody, TableCell,
@@ -12,33 +22,35 @@ function DocumentList() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // State for Summary Dialog
+  
+  // Summary dialog state
   const [openDialog, setOpenDialog] = useState(false);
   const [currentSummary, setCurrentSummary] = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
   const [currentDocumentName, setCurrentDocumentName] = useState('');
-  // State for Entity Dialog
+  
+  // Entities dialog state
   const [openEntitiesDialog, setOpenEntitiesDialog] = useState(false);
   const [currentEntities, setCurrentEntities] = useState([]);
   const [entitiesLoading, setEntitiesLoading] = useState(false);
   const [entitiesError, setEntitiesError] = useState('');
   const [currentDocumentNameEntities, setCurrentDocumentNameEntities] = useState('');
 
-  // NEW: State for Document Viewer Dialog
+  // Document viewer state
   const [openDocumentViewer, setOpenDocumentViewer] = useState(false);
   const [documentTextContent, setDocumentTextContent] = useState('');
-  const [documentViewerEntities, setDocumentViewerEntities] = useState([]); // Entities for highlighting
+  const [documentViewerEntities, setDocumentViewerEntities] = useState([]);
   const [documentViewerLoading, setDocumentViewerLoading] = useState(false);
   const [documentViewerError, setDocumentViewerError] = useState('');
   const [currentDocNameViewer, setCurrentDocNameViewer] = useState('');
 
-//   State for Chatbot in Document Viewer
+  // Chat functionality state
   const [chatQuery, setChatQuery] = useState('');
-  const [chatHistory, setChatHistory] = useState([]); // Stores { type: 'user' | 'ai', message: string }
+  const [chatHistory, setChatHistory] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
-  const [currentChatDocumentId, setCurrentChatDocumentId] = useState(null); // To store doc ID for chat
+  const [currentChatDocumentId, setCurrentChatDocumentId] = useState(null);
 
 
   useEffect(() => {

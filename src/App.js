@@ -1,3 +1,13 @@
+/**
+ * Main Application Component
+ * 
+ * Enterprise Regulatory Intelligence Platform - A comprehensive AI-powered tool
+ * for regulatory document analysis and compliance management. Features include:
+ * - Document upload and management
+ * - AI-powered policy analysis
+ * - Regulatory compliance insights
+ * - Document search and chat functionality
+ */
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import Container from '@mui/material/Container';
@@ -15,456 +25,145 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Alert from '@mui/material/Alert';
 import { marked } from 'marked';
 
-function App() {  // NEW: State for Policy Analyzer
-  const [userPolicyText, setUserPolicyText] = useState('');
-  const [policyAnalysisResult, setPolicyAnalysisResult] = useState(null);
-  const [policyAnalysisLoading, setPolicyAnalysisLoading] = useState(false);
-  const [policyAnalysisError, setPolicyAnalysisError] = useState(null);
-  const [loadingText, setLoadingText] = useState('🔍 Analyzing policy structure...');
-  // State to trigger refresh of DocumentLibrary after upload
+import { usePolicyAnalysis } from './hooks/usePolicyAnalysis';
+import LoadingSpinner from './components/common/LoadingSpinner';
+import AnimatedBackground from './components/common/AnimatedBackground';
+import Watermark from './components/common/Watermark';
+
+function App() {
+  const {
+    userPolicyText,
+    setUserPolicyText,
+    policyAnalysisResult,
+    policyAnalysisLoading,
+    policyAnalysisError,
+    loadingText,
+    handlePolicyAnalysis,
+    clearPolicyAnalysis,
+  } = usePolicyAnalysis();
+
   const [refreshDocs, setRefreshDocs] = useState(false);
-  // NEW: Handle Policy Analysis Submission with innovative loading
-  const handlePolicyAnalysis = async () => {
-    if (!userPolicyText.trim() || policyAnalysisLoading) {
-      return;
-    }
 
-    setPolicyAnalysisLoading(true);
-    setPolicyAnalysisError(null);
-    setPolicyAnalysisResult(null);
-
-    // Loading stages for innovative UI
-    const loadingStages = [
-      { text: "🔍 Analyzing policy structure...", duration: 1000 },
-      { text: "🤖 AI is reviewing compliance requirements...", duration: 2000 },
-      { text: "📋 Identifying gaps and recommendations...", duration: 1500 },
-      { text: "✨ Finalizing your personalized report...", duration: 500 }
-    ];
-
-    let currentStage = 0;
-    setLoadingText(loadingStages[0].text);
-
-    // Simulate progressive loading stages
-    const stageInterval = setInterval(() => {
-      currentStage++;
-      if (currentStage < loadingStages.length) {
-        setLoadingText(loadingStages[currentStage].text);
-      } else {
-        clearInterval(stageInterval);
-      }
-    }, 1000);
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/analyze-policy/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policy_text: userPolicyText }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Policy analysis failed: ${errorData.detail || response.statusText}`);
-      }
-      const data = await response.json();
-      
-      // Clear the interval when done
-      clearInterval(stageInterval);
-      
-      setPolicyAnalysisResult(data);
-
-    } catch (error) {
-      clearInterval(stageInterval);
-      setPolicyAnalysisError(`Error during policy analysis: ${error.message}`);
-    } finally {
-      setPolicyAnalysisLoading(false);
-    }
-  };
-
-  // Callback to refresh documents after upload
   const handleUploadSuccess = () => {
     setRefreshDocs((prev) => !prev);
   };
+
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >      {/* Video Background */}
-      <Box
-        component="video"
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="auto"
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          zIndex: -2,
-          opacity: 0.6, // Adjust opacity for better text readability
-          filter: 'brightness(0.8) contrast(1.1)', // Enhance video contrast
-        }}
-        onError={(e) => {
-          // Fallback if video fails to load
-          e.target.style.display = 'none';
-        }}
-      >
-        <source src="/background-animation.mp4" type="video/mp4" />
-        {/* Fallback background if video doesn't load */}
-      </Box>
-      
-      {/* Fallback Background (shown if video fails) */}
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-          zIndex: -3,
-        }}
-      />
-      
-      {/* Dark Overlay for Better Text Contrast */}
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.3) 0%, rgba(45, 45, 45, 0.2) 50%, rgba(30, 30, 30, 0.4) 100%)',
-          zIndex: -1,
-        }}      />
-        {/* Watermark Logo */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: { xs: 10, sm: 20 }, // Responsive positioning
-          right: { xs: 10, sm: 20 },
-          zIndex: 1000,
-          opacity: { xs: 0.1, sm: 0.15 }, // Less opacity on mobile
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            opacity: 0.4,
-            transform: 'scale(1.02)',
-          },
-        }}
-      >        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(100, 181, 246, 0.05) 100%)',
-            backdropFilter: 'blur(15px)',
-            borderRadius: 4,
-            p: { xs: 1.5, sm: 2.5 },
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '1px',
-              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-            }
-          }}>{/* Custom SVG Logo */}
-          <Box
-            sx={{
-              width: { xs: 50, sm: 60 },
-              height: { xs: 50, sm: 60 },
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-              transition: 'transform 0.3s ease',
-              '&:hover': {
-                transform: 'scale(1.1) rotate(5deg)',
-              }
-            }}
-          >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 100 100"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Rotating Outer Ring */}
-              <circle
-                cx="50"
-                cy="50"
-                r="45"
-                fill="none"
-                stroke="url(#watermarkOuterGradient)"
-                strokeWidth="2"
-                strokeDasharray="8 4"
-                opacity="0.7"
-              >
-                <animateTransform
-                  attributeName="transform"
-                  attributeType="XML"
-                  type="rotate"
-                  from="0 50 50"
-                  to="360 50 50"
-                  dur="25s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-              
-              {/* Static Outer Ring */}
-              <circle
-                cx="50"
-                cy="50"
-                r="42"
-                fill="none"
-                stroke="url(#watermarkStaticRing)"
-                strokeWidth="1"
-                opacity="0.6"
-              />
-              
-              {/* Inner Background Circle */}
-              <circle
-                cx="50"
-                cy="50"
-                r="35"
-                fill="url(#watermarkBackgroundGradient)"
-                stroke="url(#watermarkBorderGradient)"
-                strokeWidth="1"
-                opacity="0.8"
-              />
-              
-              {/* Compass Points */}
-              <g opacity="0.9">
-                {/* North Point */}
-                <polygon
-                  points="50,12 53,30 50,35 47,30"
-                  fill="url(#watermarkPointGradient)"
-                  stroke="rgba(255,255,255,0.4)"
-                  strokeWidth="0.5"
-                />
-                {/* South Point */}
-                <polygon
-                  points="50,88 53,70 50,65 47,70"
-                  fill="url(#watermarkPointGradient)"
-                  stroke="rgba(255,255,255,0.4)"
-                  strokeWidth="0.5"
-                />
-                {/* East Point */}
-                <polygon
-                  points="88,50 70,47 65,50 70,53"
-                  fill="url(#watermarkPointGradient)"
-                  stroke="rgba(255,255,255,0.4)"
-                  strokeWidth="0.5"
-                />
-                {/* West Point */}
-                <polygon
-                  points="12,50 30,47 35,50 30,53"
-                  fill="url(#watermarkPointGradient)"
-                  stroke="rgba(255,255,255,0.4)"
-                  strokeWidth="0.5"
-                />
-              </g>
-              
-              {/* Center Circle with Checkmark */}
-              <circle
-                cx="50"
-                cy="50"
-                r="18"
-                fill="url(#watermarkCenterGradient)"
-                stroke="rgba(255,255,255,0.8)"
-                strokeWidth="2"
-                opacity="0.9"
-              />
-              
-              {/* Checkmark */}
-              <path
-                d="M43 50 L47 54 L57 44"
-                fill="none"
-                stroke="rgba(255,255,255,0.9)"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              
-              {/* Subtle inner glow */}
-              <circle
-                cx="50"
-                cy="50"
-                r="15"
-                fill="none"
-                stroke="rgba(255,255,255,0.2)"
-                strokeWidth="1"
-                opacity="0.5"
-              />
-              
-              {/* Gradient Definitions for Watermark */}
-              <defs>
-                <linearGradient id="watermarkOuterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.7)" />
-                  <stop offset="50%" stopColor="rgba(100,181,246,0.5)" />
-                  <stop offset="100%" stopColor="rgba(25,118,210,0.3)" />
-                </linearGradient>
-                
-                <linearGradient id="watermarkStaticRing" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
-                  <stop offset="100%" stopColor="rgba(227,242,253,0.4)" />
-                </linearGradient>
-                
-                <radialGradient id="watermarkBackgroundGradient" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
-                  <stop offset="70%" stopColor="rgba(100,181,246,0.15)" />
-                  <stop offset="100%" stopColor="rgba(25,118,210,0.1)" />
-                </radialGradient>
-                
-                <linearGradient id="watermarkBorderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
-                  <stop offset="100%" stopColor="rgba(100,181,246,0.3)" />
-                </linearGradient>
-                
-                <linearGradient id="watermarkPointGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
-                  <stop offset="50%" stopColor="rgba(227,242,253,0.6)" />
-                  <stop offset="100%" stopColor="rgba(187,222,251,0.4)" />
-                </linearGradient>
-                
-                <radialGradient id="watermarkCenterGradient" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="rgba(102,187,106,0.8)" />
-                  <stop offset="100%" stopColor="rgba(46,125,50,0.6)" />
-                </radialGradient>
-              </defs>
-            </svg>
-          </Box>
-          {/* Logo Text */}
-          <Box sx={{ textAlign: 'center' }}>            <Typography
-              variant="caption"
-              sx={{
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.7rem',
-                letterSpacing: '1px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                lineHeight: 1.2,
-              }}
-            >
-              COMPLIANCE
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.7rem',
-                letterSpacing: '1px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                lineHeight: 1.2,
-                display: 'block',
-              }}
-            >
-              NAVIGATOR
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: '#64b5f6',
-                fontWeight: 600,
-                fontSize: '0.65rem',
-                letterSpacing: '0.8px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                lineHeight: 1.2,
-                display: 'block',
-                mt: 0.5,
-                textTransform: 'uppercase',
-              }}
-            >
-              RegGuide Platform
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-      
-      {/* Content Layer */}
-      <Box
+    <AnimatedBackground>
+      <Watermark />
+        <Box
         sx={{
           position: 'relative',
-          zIndex: 1,
+          zIndex: 2,
           minHeight: '100vh',
         }}
       >
-      <Navbar />
-      <Container
-        component="main"
-        maxWidth="md"
-        sx={{
-          mt: 0,
-          mb: 4,
-          p: 3,
-          backgroundColor: 'rgba(255,255,255,0.95)',
-          borderRadius: 3,
-          boxShadow: 4,
-        }}
-      >
-        <Typography
-          variant="h3"
-          component="h1"
-          gutterBottom
+        <Navbar />
+        <Container
+          component="main"
+          maxWidth="md"
           sx={{
+            mt: 0,
+            mb: 4,
+            p: 3,
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            borderRadius: 3,
+            boxShadow: 4,
+          }}
+        >        <Typography
+          variant="h1"
+          component="h1"          sx={{
             mt: 8,
-            mb: 2,
+            mb: 3,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            fontFamily: `'Dancing Script', 'Brush Script MT', cursive, sans-serif`,
+            fontFamily: '"Inter", "Roboto", sans-serif',
             fontWeight: 700,
-            letterSpacing: 1,
-            color: '#23272f',
-            fontSize: { xs: '2.2rem', sm: '3rem', md: '3.5rem' },
+            letterSpacing: '-0.01em',
+            background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 35%, #42a5f5 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+            fontSize: { xs: '1.8rem', sm: '2.2rem', md: '2.5rem' },
             textAlign: 'center',
+            textShadow: '0 2px 8px rgba(25, 118, 210, 0.2)',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: -8,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '80px',
+              height: '3px',
+              background: 'linear-gradient(90deg, #1565c0, #42a5f5)',
+              borderRadius: '2px',
+              opacity: 0.7,
+            }
           }}
         >
-          Regulatory Compliance Assistant
+          Enterprise Regulatory Intelligence Platform
         </Typography>
-        <Typography variant="body1" paragraph sx={{ textAlign: 'center', mb: 5 }}>
-          Upload documents or search existing ones to find relevant information and insights.
+        <Typography 
+          variant="h5" 
+          component="h2"
+          sx={{ 
+            textAlign: 'center', 
+            mb: 2,
+            fontFamily: '"Inter", "Poppins", "Roboto", sans-serif',
+            fontWeight: 600,
+            color: '#37474f',
+            fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.5rem' },
+            letterSpacing: '0.01em',
+            lineHeight: 1.4,
+          }}
+        >
+          Advanced AI-Powered Regulatory Analysis & Compliance Intelligence
         </Typography>
-
-        {/* --- File Upload Section --- */}
-        <Box
+        <Typography 
+          variant="body1" 
+          paragraph 
+          sx={{ 
+            textAlign: 'center', 
+            mb: 5,
+            color: '#546e7a',
+            fontSize: { xs: '0.95rem', sm: '1rem', md: '1.1rem' },
+            fontWeight: 400,
+            lineHeight: 1.6,
+            maxWidth: '700px',
+            mx: 'auto',
+            fontFamily: '"Inter", "Roboto", sans-serif',
+          }}
+        >
+          Professional-grade AI assistant designed for regulatory compliance teams. Streamline document analysis, 
+          extract critical insights, and accelerate compliance workflows with enterprise-level intelligence and precision.
+        </Typography>        <Box
           sx={{
             mb: 4,
             mt: 4,
-            width: '100%',        // Fill the container horizontally
-            maxWidth: 'none',     // Remove maxWidth restriction
-            mx: 0,                // Remove horizontal auto margin
+            width: '100%',
+            maxWidth: 'none',
+            mx: 0,
           }}
         >
           <FileUpload onUploadSuccess={handleUploadSuccess} />
-        </Box>        <Divider sx={{ my: 4 }} />
+        </Box>
+        
+        <Divider sx={{ my: 4 }} />
 
-        {/* --- Policy Analysis Section (Enhanced Professional UI) --- */}        <Paper
-          elevation={6}
-          sx={{
+        <Paper
+          elevation={6}          sx={{
             mt: 6,
             p: { xs: 2, sm: 4 },
-            background: 'rgba(244, 246, 248, 0.95)', // Semi-transparent background
-            backdropFilter: 'blur(15px)', // Glass effect
+            background: 'rgba(244, 246, 248, 0.95)',
+            backdropFilter: 'blur(15px)',
             borderRadius: 4,
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.20)',
             border: '1px solid rgba(224, 227, 231, 0.5)',
-            width: '100%',           // Make it fill the container horizontally
-            maxWidth: 'none',        // Remove maxWidth restriction
-            mx: 0,                   // Remove horizontal auto margin
+            width: '100%',
+            maxWidth: 'none',
+            mx: 0,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -530,35 +229,17 @@ function App() {  // NEW: State for Policy Analyzer
             ) : (
               'Analyze Policy'
             )}
-          </Button>
-          
-          {/* Loading Stage Indicator */}
-          {policyAnalysisLoading && (
-            <Box sx={{ 
-              mb: 2, 
-              p: 2, 
-              bgcolor: '#f3e5f5', 
-              borderRadius: 2, 
-              border: '1px solid #e1bee7',
-              textAlign: 'center'
-            }}>
-              <Typography variant="body2" sx={{ 
-                color: '#7b1fa2', 
-                fontWeight: 600,
-                fontSize: '1rem',
-                animation: 'pulse 1.5s ease-in-out infinite'
-              }}>
-                {loadingText}
-              </Typography>
-              <Typography variant="caption" sx={{ 
-                color: '#9c27b0', 
-                mt: 1, 
-                display: 'block',
-                fontStyle: 'italic'
-              }}>
-                🧠 Our AI is working hard to give you the best insights...
-              </Typography>
-            </Box>
+          </Button>          {policyAnalysisLoading && (
+            <LoadingSpinner 
+              text={loadingText}
+              sx={{ 
+                mb: 2, 
+                p: 2, 
+                bgcolor: '#f3e5f5', 
+                borderRadius: 2, 
+                border: '1px solid #e1bee7'
+              }}
+            />
           )}
           
           {policyAnalysisError && (
@@ -699,56 +380,24 @@ Analysis Summary:
                   }}
                 >
                   📋 Copy Analysis
-                </Button>
-                <Button
+                </Button>                <Button
                   variant="outlined"
                   size="small"
                   color="secondary"
-                  onClick={() => {
-                    setPolicyAnalysisResult(null);
-                    setUserPolicyText('');
-                  }}
+                  onClick={clearPolicyAnalysis}
                 >
                   🔄 New Analysis
                 </Button>
               </Box>
             </Box>
-          )}
-        </Paper>        <Divider sx={{ my: 4 }} />
+          )}        </Paper>
+        
+        <Divider sx={{ my: 4 }} />        <Divider sx={{ my: 4 }} />
 
-        {/* --- Document List Section --- */}
-        <DocumentLibrary refresh={refreshDocs} /></Container>
-      
-      {/* CSS Animations for loading */}
-      <style>
-        {`
-          @keyframes pulse {
-            0% {
-              opacity: 1;
-              transform: scale(1);
-            }
-            50% {
-              opacity: 0.7;
-              transform: scale(1.02);
-            }
-            100% {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
-        `}
-      </style>
-      
-      {/* Add Google Fonts link for Dancing Script */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap"
-        rel="stylesheet"
-      />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap"
-        rel="stylesheet"      />
+        <DocumentLibrary refresh={refreshDocs} />
+      </Container>
       </Box>
-    </Box>
+    </AnimatedBackground>
   );
 }
 

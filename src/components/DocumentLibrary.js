@@ -1,3 +1,15 @@
+/**
+ * DocumentLibrary Component
+ * 
+ * Main document management interface that provides:
+ * - Grouped document display by subject area
+ * - Document summarization (cloud and local)
+ * - Entity extraction and highlighting
+ * - Integrated document chat functionality
+ * - Document search across uploaded files
+ * - Document viewer with full content display
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -44,7 +56,6 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
 
-// Helper to format date as "Month Day, Year, HH:MM AM/PM PST"
 function formatDateTime(dateString) {
   const date = new Date(dateString);
   return date.toLocaleString('en-US', {
@@ -60,45 +71,56 @@ function formatDateTime(dateString) {
 }
 
 function DocumentLibrary({ refresh }) {
+  // Core state
   const [documents, setDocuments] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState({});
   const [entitiesLoading, setEntitiesLoading] = useState({});
-  // Chatbot states
+  
+  // Chat functionality
   const [chatOpen, setChatOpen] = useState(false);
   const [currentDocId, setCurrentDocId] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  // Document viewer states
+  
+  // Document viewer
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
   const [documentContent, setDocumentContent] = useState('');
   const [documentViewerLoading, setDocumentViewerLoading] = useState(false);
-  const [currentDocumentName, setCurrentDocumentName] = useState('');  // Summary dialog states
+  const [currentDocumentName, setCurrentDocumentName] = useState('');
+  
+  // Summary dialog
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [summaryContent, setSummaryContent] = useState('');
-  const [summaryType, setSummaryType] = useState(''); // 'cloud' or 'local'
-  const [summaryDocumentName, setSummaryDocumentName] = useState('');  // Entities dialog states
+  const [summaryType, setSummaryType] = useState('');
+  const [summaryDocumentName, setSummaryDocumentName] = useState('');
+  
+  // Entities dialog
   const [entitiesDialogOpen, setEntitiesDialogOpen] = useState(false);
-  const [entitiesContent, setEntitiesContent] = useState([]);  const [entitiesDocumentName, setEntitiesDocumentName] = useState('');
-  // Search states for integrated search within uploaded documents
+  const [entitiesContent, setEntitiesContent] = useState([]);
+  const [entitiesDocumentName, setEntitiesDocumentName] = useState('');
+  
+  // Search functionality
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState('');  const [lastSearchQuery, setLastSearchQuery] = useState(''); // Track what was searched  // Delete confirmation dialog states
+  const [searchError, setSearchError] = useState('');
+  const [lastSearchQuery, setLastSearchQuery] = useState('');
+  
+  // Delete confirmation
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  // Notification states
+  
+  // Notifications
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
-  const [notificationSeverity, setNotificationSeverity] = useState('success'); // 'success' | 'error'
-
-  // Helper function to group documents by subject
+  const [notificationSeverity, setNotificationSeverity] = useState('success');
   const groupDocumentsBySubject = (documents) => {
     const grouped = {};
-    // Add safety check for documents array and filter out null/undefined items
+    
     if (!documents || !Array.isArray(documents)) {
       return grouped;
     }
@@ -111,12 +133,12 @@ function DocumentLibrary({ refresh }) {
       grouped[subject].push(doc);
     });
     
-    // Sort documents within each subject by upload_date in descending order (latest first)
+    // Sort documents by upload date (latest first)
     Object.keys(grouped).forEach(subject => {
       grouped[subject].sort((a, b) => {
         const dateA = new Date(a.upload_date);
         const dateB = new Date(b.upload_date);
-        return dateB - dateA; // Descending order (latest first)
+        return dateB - dateA;
       });
     });
     
@@ -135,10 +157,8 @@ function DocumentLibrary({ refresh }) {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchDocuments();
-    // eslint-disable-next-line
   }, [refresh]);
 
   const handleExpandClick = (id) => {
@@ -147,8 +167,7 @@ function DocumentLibrary({ refresh }) {
     const document = documents.find(doc => doc.id === id);
     setDocumentToDelete(document);
     setDeleteConfirmOpen(true);
-  };
-  const handleConfirmDelete = async () => {
+  };  const handleConfirmDelete = async () => {
     if (!documentToDelete) return;
     
     setDeleteLoading(true);
@@ -160,18 +179,14 @@ function DocumentLibrary({ refresh }) {
       }
       
       setDocuments((prev) => prev.filter((doc) => doc.id !== documentToDelete.id));
-      
-      // Close dialog and reset state
       setDeleteConfirmOpen(false);
       setDocumentToDelete(null);
       
-      // Show success notification
       setNotificationMessage(`Document "${documentToDelete.filename}" deleted successfully!`);
       setNotificationSeverity('success');
       setNotificationOpen(true);
     } catch (error) {
       console.error('Error deleting document:', error);
-      // Show error notification
       setNotificationMessage(`Failed to delete document: ${error.message}`);
       setNotificationSeverity('error');
       setNotificationOpen(true);
@@ -184,18 +199,15 @@ function DocumentLibrary({ refresh }) {
     setDeleteConfirmOpen(false);
     setDocumentToDelete(null);
     setDeleteLoading(false);
-  };
-  const handleSummarizeCloud = async (docId) => {
+  };  const handleSummarizeCloud = async (docId) => {
     setSummaryLoading(prev => ({ ...prev, [docId]: true }));
     try {
-      // First get the document text
       const textResponse = await fetch(`${BACKEND_BASE_URL}/api/documents/${docId}/text`);
       if (!textResponse.ok) {
         throw new Error('Failed to fetch document text');
       }
       const documentText = await textResponse.text();
 
-      // Then summarize it
       const summaryResponse = await fetch(`${BACKEND_BASE_URL}/api/summarize-text/`, {
         method: 'POST',
         headers: {

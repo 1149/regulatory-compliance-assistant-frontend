@@ -1,4 +1,11 @@
-// src/components/Navbar.js
+/**
+ * Navigation Bar Component
+ * 
+ * Professional header with glassmorphism design featuring:
+ * - Custom SVG compliance icon with hover animations
+ * - Gradient background with backdrop blur effects
+ * - Clean typography for brand identity
+ */
 import React from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
@@ -6,9 +13,10 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
 function Navbar() {
-  return (    <AppBar position="static" sx={{ 
+  return (
+    <AppBar position="static" sx={{ 
       background: 'linear-gradient(135deg, rgba(21, 101, 192, 0.95) 0%, rgba(25, 118, 210, 0.9) 50%, rgba(30, 136, 229, 0.95) 100%)',
-      backdropFilter: 'blur(15px)', // Enhanced glass effect
+      backdropFilter: 'blur(15px)',
       boxShadow: '0 4px 30px rgba(0, 0, 0, 0.4)',
       borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
       position: 'relative',
@@ -21,13 +29,14 @@ function Navbar() {
         height: '1px',
         background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
       }
-    }}><Toolbar sx={{ py: 1 }}>
+    }}>
+      <Toolbar sx={{ py: 1 }}>
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
           flexGrow: 1,
           gap: 2
-        }}>          {/* Custom SVG Logo */}
+        }}>
           <Box
             sx={{
               width: 45,
@@ -197,46 +206,64 @@ function Navbar() {
           <Box>            <Typography 
               variant="h5" 
               sx={{ 
-                fontFamily: '"Inter", "Poppins", "Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontWeight: 800,
-                fontSize: { xs: '1.3rem', sm: '1.5rem', md: '1.7rem' },
-                background: 'linear-gradient(135deg, #ffffff 0%, #e3f2fd 100%)',
+                fontFamily: '"Inter", "Roboto", "Segoe UI", "Helvetica", "Arial", sans-serif',
+                fontWeight: 700,
+                fontSize: { xs: '1.4rem', sm: '1.6rem', md: '1.8rem' },
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 50%, #e8f0fe 100%)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                letterSpacing: '0.5px',
-                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                lineHeight: 1.2,
+                letterSpacing: '0.8px',
+                textShadow: '0 3px 6px rgba(0,0,0,0.25)',
+                lineHeight: 1.1,
                 position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
                 '&::after': {
                   content: '""',
                   position: 'absolute',
-                  bottom: -2,
+                  bottom: -3,
                   left: 0,
                   width: '100%',
                   height: '2px',
-                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
                   borderRadius: '1px',
                 }
-              }}
-            >
-              Compliance Navigator
-            </Typography>            <Typography 
+              }}            >
+              <Box component="span" sx={{ fontWeight: 700 }}>
+                Compliance
+              </Box>
+              <Box 
+                component="span" 
+                sx={{ 
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #64b5f6 0%, #42a5f5 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  ml: 0.8
+                }}
+              >
+                Navigator
+              </Box>
+            </Typography>
+            <Typography 
               variant="caption" 
               sx={{ 
-                fontFamily: '"Inter", "Poppins", sans-serif',
-                color: '#64b5f6',
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                letterSpacing: '1px',
+                fontFamily: '"Inter", "Roboto", sans-serif',
+                color: '#90caf9',
+                fontWeight: 500,
+                fontSize: '0.7rem',
+                letterSpacing: '1.2px',
                 textTransform: 'uppercase',
-                opacity: 0.9,
+                opacity: 0.85,
                 display: 'block',
-                mt: -0.5,
-                textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                mt: -0.3,
+                textShadow: '0 1px 3px rgba(0,0,0,0.3)',
               }}
             >
-              RegGuide Platform
+              Regulatory Intelligence Platform
             </Typography>
           </Box>
         </Box>
