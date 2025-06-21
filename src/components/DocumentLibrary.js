@@ -234,44 +234,11 @@ function DocumentLibrary({ refresh }) {
     } finally {
       setSummaryLoading(prev => ({ ...prev, [docId]: false }));
     }
-  };
-  const handleSummarizeLocal = async (docId) => {
-    setSummaryLoading(prev => ({ ...prev, [docId + '_local']: true }));
-    try {
-      // First get the document text
-      const textResponse = await fetch(`${BACKEND_BASE_URL}/api/documents/${docId}/text`);
-      if (!textResponse.ok) {
-        throw new Error('Failed to fetch document text');
-      }
-      const documentText = await textResponse.text();
-
-      // Then summarize it using local endpoint
-      const summaryResponse = await fetch(`${BACKEND_BASE_URL}/api/summarize-text-local/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: documentText }),
-      });
-
-      if (!summaryResponse.ok) {
-        throw new Error('Failed to generate local summary');
-      }
-
-      const summaryData = await summaryResponse.json();
-      
-      // Show summary in dialog instead of alert
-      const document = documents.find(doc => doc.id === docId);
-      setSummaryDocumentName(document?.filename || `Document ${docId}`);
-      setSummaryContent(summaryData.summary);
-      setSummaryType('local');
-      setSummaryDialogOpen(true);
-    } catch (error) {
-      console.error('Error with local summarization:', error);
-      alert('Failed to summarize document locally. Make sure Ollama is running.');
-    } finally {
-      setSummaryLoading(prev => ({ ...prev, [docId + '_local']: false }));
-    }
+  };  const handleSummarizeLocal = async (docId) => {
+    // Show notification that this is a test feature
+    setNotificationMessage('Local AI is just a test feature. I am still working on integrating our own LLM. In the meantime, please try the Cloud AI version. Thanks!');
+    setNotificationSeverity('info');
+    setNotificationOpen(true);
   };
   const handleViewEntities = async (docId) => {
     setEntitiesLoading(prev => ({ ...prev, [docId]: true }));
